@@ -63,6 +63,19 @@ def pil_loader(path):
     with open(path, 'rb') as f:
         img = Image.open(f)
         return img.convert('RGB')
+    
+    
+def check_stereo_paths_consistency(c1, c2):
+    """Check that left and right camera images has the same file name timestamp parts. """
+    # TODO: May be differencesin 1-2 time units can be neglected?
+    im1 = os.path.basename(c1).split('_')
+    im2 = os.path.basename(c2).split('_')
+    im1_part = '_'.join(im1[:2])
+    im2_part = '_'.join(im2[:2])
+    if im1_part != im2_part:
+        warnings.warn("Not consistent stereo pair paths: \n{}\n{}".format(im1_part,
+                                    im2_part))
+
 
     
 class Apolloscape(Dataset):
@@ -128,22 +141,45 @@ class Apolloscape(Dataset):
             cam2s = sorted(glob.glob(os.path.join(image_dir, r, self.cameras_list[1], '*.jpg')),
                            reverse=not self.apollo_original_order)
             
-            
             # Read poses for first camera
             pose1s = read_poses_for_camera(os.path.join(pose_dir, r), self.cameras_list[0])
                         
             # Read poses for second camera
             pose2s = read_poses_for_camera(os.path.join(pose_dir, r), self.cameras_list[1])
             
+            c1_idx = 0
+            c2_idx = 0
+            while c1_idx < len(cam1s) and c2_idx < len(cam2s):
+                c1 = cam1s[c1_idx]
+                c2 = cam2s[c2_idx]
+                
+                # Check stereo image path consistency
+                im1 = os.path.basename(c1).split('_')
+                im2 = os.path.basename(c2).split('_')
+                im1_part = '_'.join(im1[:2])
+                im2_part = '_'.join(im2[:2])
+                
+                if im1_part != im2_part:
+                    # Non-consistent images, drop with the lowest time unit
+                    # and repeat with the next idx
+                    if im1_part < im2_part:
+                        c1_idx += 1
+                    else:
+                        c2_idx += 1
+                else:
+                    # Images has equal timing (filename prefix) so add them to data.
+                    item = []
+                    item.append(c1)
+                    item.append(pose1s[os.path.basename(c1)])
+                    item.append(c2)
+                    item.append(pose2s[os.path.basename(c2)])
+                    item.append(r)
+                    self.data.append(item)
             
-            for c1, c2 in zip(cam1s, cam2s):
-                item = []
-                item.append(c1)
-                item.append(pose1s[os.path.basename(c1)])
-                item.append(c2)
-                item.append(pose2s[os.path.basename(c2)])
-                item.append(r)
-                self.data.append(item)
+                    # Continue with the next pair of images
+                    c1_idx += 1
+                    c2_idx += 1
+
                 
         # Save for extracting poses directly
         self.data_array = np.array(self.data, dtype=object)
@@ -232,16 +268,20 @@ class Apolloscape(Dataset):
             ditem = self.data[self.record_idxs[idx]]
         else:
             ditem = self.data[idx]
+            
+        
+        # print("paths = \n{}\n{}".format(ditem[0], ditem[2]));
+        
+        check_stereo_paths_consistency(ditem[0], ditem[2])
         
         images = []
         poses = []
         for im, pos in zip([0,2], [1,3]):
             img = pil_loader(ditem[im])
             if self.transform is not None:
-                img = self.transform(img)
+                img = self.transform(img)                
             images.append(img)
             poses.append(ditem[pos])
-            
         return images, poses
     
     

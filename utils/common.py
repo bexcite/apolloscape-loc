@@ -13,7 +13,7 @@ def make_video(dataset, record=None, outfile=None):
         dataset.record = record
         
     if outfile is None:
-        outfile = "./output_data/videos/video_{}_{}.mp4".format(dataset.road, dataset.record)
+        outfile = "./output_data/videos/{}_{}.mp4".format(dataset.road, dataset.record)
 
         
     # Make dirs for video if needed
