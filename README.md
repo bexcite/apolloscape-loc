@@ -5,6 +5,6 @@ ECCV2018 Self-localization on-the-fly task - [challenge page](http://apolloscape
 
 See roads and record graphs in [Apolloscape_View_Records Notebook](./Apolloscape_View_Records.ipynb)
 
-Implemented as an PyTorch 0.4 Dataset. 
+Implemented as a PyTorch 0.4 Dataset. 
 
 __NOTE: This repository is work in progress.__
