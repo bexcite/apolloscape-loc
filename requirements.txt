@@ -1,0 +1,12 @@
+# Versions 0.4.0 & 0.2.1
+torch
+torchvision
+
+matplotlib
+numpy
+
+tqdm
+transforms3d
+tensorboardX
+
+jupyter
