@@ -81,7 +81,7 @@ def check_stereo_paths_consistency(c1, c2):
 class Apolloscape(Dataset):
     """Baidu Apolloscape dataset"""
     
-    def __init__(self, root, road="road03_seg", transform=None, record=None):
+    def __init__(self, root, road="road03_seg", transform=None, record=None, normalize_poses=False):
         """
             Args:
                 root (string): Dataset directory
@@ -94,6 +94,7 @@ class Apolloscape(Dataset):
         self.transform = transform
         self.road_path = os.path.join(self.root, self.road)
         
+        self.normalize_poses = normalize_poses
         self.apollo_original_order = True
         
         # Resolve image dir
@@ -183,13 +184,35 @@ class Apolloscape(Dataset):
                 
         # Save for extracting poses directly
         self.data_array = np.array(self.data, dtype=object)
-        
+                
         # Used as a filter in __len__ and __getitem__
         self.record = record
+        
+        # Calc mean and std
+        all_poses = np.empty((0, 4, 4))
+        for p in np.concatenate((self._data_array[:,1], self._data_array[:,3])):
+            all_poses = np.vstack((all_poses, np.expand_dims(p, axis=0)))
+        self.poses_mean = np.mean(all_poses, axis=0)
+        self.poses_std = np.std(all_poses, axis=0)
+#         print('poses_poses = {}'.format(self.poses_mean))
+#         print('poses_std = {}'.format(self.poses_std))
+
+        
+        if self.normalize_poses:
+#             print('Poses Normalized!')
+            all_poses -= self.poses_mean
+            all_poses = np.divide(all_poses, self.poses_std, where=self.poses_std!=0)
+            l = len(all_poses)//2
+            self._data_array[:,1] = [x for x in all_poses[:l]]
+            self._data_array[:,3] = [x for x in all_poses[l:]]
+        
+#         print('all_poses.len = {}'.format(len(all_poses)))
+#         print('poses_poses = {}'.format(self.poses_mean))
+#         print('poses_std = {}'.format(self.poses_std))
 
     @property
     def data_array(self):
-        if self.record_idxs is not None:
+        if hasattr(self, 'record_idxs') and self.record_idxs is not None:
             return self._data_array[self.record_idxs]
         return self._data_array
     
@@ -258,18 +281,17 @@ class Apolloscape(Dataset):
     def __len__(self):
         if self.record_idxs is not None:
             return len(self.record_idxs)
-        return len(self.data)
+        return len(self.data_array)
     
     
     def __getitem__(self, idx):
         
         # If we have a record than work with filtered self.record_idxs
         if self.record_idxs is not None:
-            ditem = self.data[self.record_idxs[idx]]
+            ditem = self._data_array[self.record_idxs[idx]]
         else:
-            ditem = self.data[idx]
+            ditem = self._data_array[idx]
             
-        
         # print("paths = \n{}\n{}".format(ditem[0], ditem[2]));
         
         check_stereo_paths_consistency(ditem[0], ditem[2])
@@ -280,7 +302,7 @@ class Apolloscape(Dataset):
             img = pil_loader(ditem[im])
             if self.transform is not None:
                 img = self.transform(img)                
-            images.append(img)
+            images.append(img)            
             poses.append(ditem[pos])
         return images, poses
     
@@ -290,6 +312,7 @@ class Apolloscape(Dataset):
         fmt_str += "    Road: {}\n".format(self.road)
         fmt_str += "    Record: {}\n".format(self.record)
         fmt_str += "    Length: {} of {}\n".format(self.__len__(), len(self.data))
+        fmt_str += "    Normalize Poses: {}\n".format(self.normalize_poses)
         fmt_str += "    Cameras: {}\n".format(self.cameras_list)
         fmt_str += "    Records: {}\n".format(self.records_list)
         return fmt_str
