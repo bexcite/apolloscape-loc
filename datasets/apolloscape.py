@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import transforms3d.euler as txe
+import transforms3d.quaternions as txq
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from utils.common import calc_poses_params
@@ -76,18 +77,57 @@ def check_stereo_paths_consistency(c1, c2):
         warnings.warn("Not consistent stereo pair paths: \n{}\n{}".format(im1_part,
                                     im2_part))
 
+        
+def process_poses(all_poses, pose_format='full-mat',
+                  normalize_poses=True):
+    # Default pose format is full-mat
+    new_poses = all_poses
+    if pose_format == 'quat':
+        # Convert to quaternions
+        new_poses = np.zeros((len(all_poses), 7))
+        for i in range(len(all_poses)):
+            p = all_poses[i]
+            R = p[:3, :3]
+            t = p[:3, 3]
+            q = txq.mat2quat(R)
+            new_poses[i, :3] = t
+            new_poses[i, 3:] = q
+#             if i == 0:
+#                 print('R = {}'.format(R))
+#                 print('t = {}'.format(t))
+#                 print('q = {}'.format(q))
+#                 print('t.shape = {}'.format(t.shape))
+#                 print('new_poses[i] = {}'.format(new_poses[i]))
+        all_poses = new_poses
+
+    poses_mean = np.mean(all_poses, axis=0)
+    poses_std = np.std(all_poses, axis=0)
+                             
+    if normalize_poses:
+        print('Poses Normalized!')
+        if pose_format == 'quat':            
+            all_poses[:, :3] -= poses_mean[:3]
+            all_poses[:, :3] = np.divide(all_poses[:, :3], poses_std[:3], where=poses_std[:3]!=0)
+        else: # 'full-mat'
+            all_poses -= poses_mean
+            all_poses = np.divide(all_poses, poses_std, where=poses_std!=0)
+
+    return all_poses, poses_mean, poses_std
+
 
     
 class Apolloscape(Dataset):
     """Baidu Apolloscape dataset"""
     
-    def __init__(self, root, road="road03_seg", transform=None, record=None, normalize_poses=False):
+    def __init__(self, root, road="road03_seg", transform=None, record=None,
+                 normalize_poses=False, pose_format='full-mat'):
         """
             Args:
                 root (string): Dataset directory
                 road (string): Road subdir
                 transform (callable, optional): A function/transform, similar to other PyTorch datasets
                 record (string): Record name from dataset. Dataset organized in a structure '{road}/{recordXXX}'
+                pose_format (string): One of 'full-mat', 'rot-mat', 'quat', 'angles'
         """
         self.root = os.path.expanduser(root)
         self.road = road
@@ -95,6 +135,7 @@ class Apolloscape(Dataset):
         self.road_path = os.path.join(self.root, self.road)
         
         self.normalize_poses = normalize_poses
+        self.pose_format = pose_format
         self.apollo_original_order = True
         
         # Resolve image dir
@@ -192,19 +233,34 @@ class Apolloscape(Dataset):
         all_poses = np.empty((0, 4, 4))
         for p in np.concatenate((self._data_array[:,1], self._data_array[:,3])):
             all_poses = np.vstack((all_poses, np.expand_dims(p, axis=0)))
-        self.poses_mean = np.mean(all_poses, axis=0)
-        self.poses_std = np.std(all_poses, axis=0)
+        
 #         print('poses_poses = {}'.format(self.poses_mean))
 #         print('poses_std = {}'.format(self.poses_std))
 
-        
-        if self.normalize_poses:
-#             print('Poses Normalized!')
-            all_poses -= self.poses_mean
-            all_poses = np.divide(all_poses, self.poses_std, where=self.poses_std!=0)
-            l = len(all_poses)//2
-            self._data_array[:,1] = [x for x in all_poses[:l]]
-            self._data_array[:,3] = [x for x in all_poses[l:]]
+        # Process and convert poses
+        all_poses_processed, poses_mean, poses_std = process_poses(all_poses,
+                pose_format=self.pose_format,
+                normalize_poses=self.normalize_poses)
+        self.poses_mean = poses_mean
+        self.poses_std = poses_std
+
+        # Reassign poses after processing
+        l = len(all_poses_processed)//2
+        self._data_array[:,1] = [x for x in all_poses_processed[:l]]
+        self._data_array[:,3] = [x for x in all_poses_processed[l:]]
+
+#         if self.normalize_poses:
+# #             print('Poses Normalized!')
+#             all_poses -= self.poses_mean
+#             all_poses = np.divide(all_poses, self.poses_std, where=self.poses_std!=0)
+#             l = len(all_poses)//2
+#             self._data_array[:,1] = [x for x in all_poses[:l]]
+#             self._data_array[:,3] = [x for x in all_poses[l:]]
+            
+#         print('pose sample = {}'.format(self._data_array[0, 1]))
+#         print('poses_mean = {}'.format(self.poses_mean))
+#         print('poses_std = {}'.format(self.poses_std))
+
         
 #         print('all_poses.len = {}'.format(len(all_poses)))
 #         print('poses_poses = {}'.format(self.poses_mean))
@@ -304,7 +360,7 @@ class Apolloscape(Dataset):
                 img = self.transform(img)                
             images.append(img)            
             npos = torch.from_numpy(ditem[pos])
-            poses.append(npos)
+            poses.append(npos.float())
         return images, poses
     
     
