@@ -303,7 +303,8 @@ class Apolloscape(Dataset):
             if self.transform is not None:
                 img = self.transform(img)                
             images.append(img)            
-            poses.append(ditem[pos])
+            npos = torch.from_numpy(ditem[pos])
+            poses.append(npos)
         return images, poses
     
     
