@@ -183,9 +183,19 @@ def read_original_splits(filename):
         return set(lines)
 
 
+def get_rec_path(image_path):
+    """Returns image path part {Record}/{Camera}/{Image}"""
+    cp = os.path.splitext(image_path)[0]
+    cp = os.path.normpath(cp).split(os.sep)
+    cp = '/'.join(cp[-3:])
+    return cp
+
+
 
 class Apolloscape(Dataset):
     """Baidu Apolloscape dataset"""
+
+    val_ratio = 0.25
 
     def __init__(self, root, road="road03_seg", transform=None, record=None,
                  normalize_poses=False, pose_format='full-mat', train=None, paired=True):
@@ -249,7 +259,7 @@ class Apolloscape(Dataset):
         self.cameras_list = sorted(os.listdir(os.path.join(image_dir, self.records_list[0])),
                                    reverse=not self.apollo_original_order)
 
-        self.matadata_road_dir = os.path.join('_metadata', road)
+        self.metadata_road_dir = os.path.join('_metadata', road)
 
 
         # Read all data
@@ -257,24 +267,41 @@ class Apolloscape(Dataset):
                                   apollo_original_order=self.apollo_original_order)
 
 
-        # Check do we have train/val split
+        # Check do we have train/val splits
         if self.train is not None:
             trainval_split_dir = os.path.join(self.road_path, "trainval_split")
             if not os.path.exists(trainval_split_dir):
                 # Check do we have our own split
-                print('we have our own splits')
+                print('check our own splits')
                 trainval_split_dir = os.path.join(self.metadata_road_dir, "trainval_split")
+                if not os.path.exists(trainval_split_dir):
+                    # Create our own splits
+                    print('create our splits')
+                    self.create_train_val_splits(trainval_split_dir)
+                else:
+                    print('we have our splits')
             else:
                 print('we have original splits')
 
+            self.train_split = read_original_splits(os.path.join(trainval_split_dir, 'train.txt'))
+            self.val_split = read_original_splits(os.path.join(trainval_split_dir, 'val.txt'))
+
+
+            """
             if os.path.exists(trainval_split_dir):
                 # Have splits let's use them
-
+                print('splits exist')
+                print(os.path.join(trainval_split_dir, 'train.txt'))
+                print(os.path.join(trainval_split_dir, 'val.txt'))
                 self.train_split = read_original_splits(os.path.join(trainval_split_dir, 'train.txt'))
                 self.val_split = read_original_splits(os.path.join(trainval_split_dir, 'val.txt'))
             else:
                 # Create our own splits
-                self.create_train_val_splits(trainval_split_dir, self.data)
+                print('create our own splits')
+                self.create_train_val_splits(trainval_split_dir)
+                self.train_split = read_original_splits(os.path.join(trainval_split_dir, 'train.txt'))
+                self.val_split = read_original_splits(os.path.join(trainval_split_dir, 'val.txt'))
+            """
 
             """
             if (os.path.exists(trainval_split_dir)
@@ -303,10 +330,16 @@ class Apolloscape(Dataset):
 
         # Filter Train/Val
         if self.train is not None:
-            def check_train_val(c1, c2):
-                print('c1 = {}'.format(c1))
-                print('c2 = {}'.format(c2))
-                return True
+            def check_train_val(*args):
+                result = True
+                for a in args:
+                    # cp = os.path.normpath(a).split(os.sep)
+                    # cp = '/'.join(cp[-3:])
+                    cp = get_rec_path(a)
+                    result = result and self.check_test_val(cp)
+                    print('check = {}'.format(cp))
+                print('res = {}'.format(result))
+                return result
             self.data = [r for r in self.data if check_train_val(r[0], r[2])]
 
 
@@ -388,6 +421,8 @@ class Apolloscape(Dataset):
         # Save for extracting poses directly
         self.data_array = np.array(self.data, dtype=object)
 
+        print('data_array = {}'.format(self.data_array))
+
         # Used as a filter in __len__ and __getitem__
         self.record = record
 
@@ -430,20 +465,47 @@ class Apolloscape(Dataset):
 
 
     def check_test_val(self, filename_path):
+        """Checks whether to add image file to dataset based on Train/Val setting
+
+        Args:
+            filename_path (string): path in format ``{Record}/{Camera}/{image_name}.jpg``
+        """
         if self.train is not None:
-            fname = os.path.splitext(filename_path)[0]
+            # fname = os.path.splitext(filename_path)[0]
+            fname = filename_path
             if self.train:
                 return fname in self.train_split
             else:
+                print('test_val, fname = {}, == {}'.format(fname, fname in self.val_split))
                 return fname in self.val_split
         else:
             return True
 
-    def create_train_val_splits(train_val_split_dir):
+
+    def create_train_val_splits(self, trainval_split_dir):
         """Creates splits and saves it to ``train_val_split_dir``"""
 
-        if not os.path.exists(train_val_split_dir):
-            os.makedirs(train_val_split_dir)
+        if not os.path.exists(trainval_split_dir):
+            os.makedirs(trainval_split_dir)
+
+        # Simply cut val_ratio to validation
+        l = int(len(self.data) * (1 - self.val_ratio))
+
+        # Save train.txt
+        with open(os.path.join(trainval_split_dir, 'train.txt'), 'w') as f:
+            for s in self.data[:l]:
+                f.write('{}\n'.format(get_rec_path(s[0])))
+                f.write('{}\n'.format(get_rec_path(s[2])))
+        print('saved to {}'.format(os.path.join(trainval_split_dir, 'train.txt')))
+
+        # Save val.txt
+        with open(os.path.join(trainval_split_dir, 'val.txt'), 'w') as f:
+            for s in self.data[l:]:
+                f.write('{}\n'.format(get_rec_path(s[0])))
+                f.write('{}\n'.format(get_rec_path(s[2])))
+        print('saved to {}'.format(os.path.join(trainval_split_dir, 'val.txt')))
+
+
 
         # Make splits
 
