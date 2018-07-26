@@ -78,6 +78,68 @@ def check_stereo_paths_consistency(c1, c2):
                                     im2_part))
 
 
+def read_all_data(image_dir, pose_dir, records_list, cameras_list,
+        apollo_original_order=False):
+    # iterate over all records and store it in internal data
+    data = []
+    skipped_inc = 0
+    skipped_other = 0
+    for i, r in enumerate(records_list):
+        cam1s = sorted(glob.glob(os.path.join(image_dir, r, cameras_list[0], '*.jpg')),
+                       reverse=not apollo_original_order)
+        cam2s = sorted(glob.glob(os.path.join(image_dir, r, cameras_list[1], '*.jpg')),
+                       reverse=not apollo_original_order)
+
+        # Read poses for first camera
+        pose1s = read_poses_for_camera(os.path.join(pose_dir, r), cameras_list[0])
+
+        # Read poses for second camera
+        pose2s = read_poses_for_camera(os.path.join(pose_dir, r), cameras_list[1])
+
+        c1_idx = 0
+        c2_idx = 0
+        while c1_idx < len(cam1s) and c2_idx < len(cam2s):
+            c1 = cam1s[c1_idx]
+            c2 = cam2s[c2_idx]
+
+            # Check stereo image path consistency
+            im1 = os.path.basename(c1).split('_')
+            im2 = os.path.basename(c2).split('_')
+            im1_part = '_'.join(im1[:2])
+            im2_part = '_'.join(im2[:2])
+
+            if im1_part != im2_part:
+                # Non-consistent images, drop with the lowest time unit
+                # and repeat with the next idx
+                skipped_inc += 1
+                if im1_part < im2_part:
+                    c1_idx += 1
+                else:
+                    c2_idx += 1
+            else:
+
+                # Images has equal timing (filename prefix) so add them to data.
+                item = []
+                item.append(c1)
+                item.append(pose1s[os.path.basename(c1)])
+                item.append(c2)
+                item.append(pose2s[os.path.basename(c2)])
+                item.append(r)
+                data.append(item)
+
+                # print('check1 = {}'.format(check1))
+                # print(self.check_test_val(check1))
+                # print('check2 = {}'.format(check2))
+                # print(self.check_test_val(check2))
+
+                # Continue with the next pair of images
+                c1_idx += 1
+                c2_idx += 1
+    return data
+
+
+
+
 def process_poses(all_poses, pose_format='full-mat',
                   normalize_poses=True):
     # Default pose format is full-mat
@@ -115,12 +177,18 @@ def process_poses(all_poses, pose_format='full-mat',
     return all_poses, poses_mean, poses_std
 
 
+def read_original_splits(filename):
+    with open(filename, 'r') as f:
+        lines = f.read().splitlines()
+        return set(lines)
+
+
 
 class Apolloscape(Dataset):
     """Baidu Apolloscape dataset"""
 
     def __init__(self, root, road="road03_seg", transform=None, record=None,
-                 normalize_poses=False, pose_format='full-mat'):
+                 normalize_poses=False, pose_format='full-mat', train=None, paired=True):
         """
             Args:
                 root (string): Dataset directory
@@ -128,6 +196,10 @@ class Apolloscape(Dataset):
                 transform (callable, optional): A function/transform, similar to other PyTorch datasets
                 record (string): Record name from dataset. Dataset organized in a structure '{road}/{recordXXX}'
                 pose_format (string): One of 'full-mat', 'rot-mat', 'quat', 'angles'
+                train (bool): default None - use all dataset, True - use just train dataset,
+                              False - use val portion of a dataset if `train` is not None Records selection
+                              are not applicable
+                paired (bool): Retrun stereo pairs
         """
         self.root = os.path.expanduser(root)
         self.road = road
@@ -136,6 +208,7 @@ class Apolloscape(Dataset):
 
         self.normalize_poses = normalize_poses
         self.pose_format = pose_format
+        self.train = train
         self.apollo_original_order = True
 
         # Resolve image dir
@@ -163,6 +236,7 @@ class Apolloscape(Dataset):
             warnings.warn("Pose directory can't be find in dataset path '{}'. " +
                           "Should be either 'Pose' or 'pose'".format(self.road_path))
 
+
         self.records_list = [f for f in os.listdir(image_dir) if f not in [".DS_Store"]]
         self.records_list = sorted(self.records_list)
 
@@ -175,8 +249,73 @@ class Apolloscape(Dataset):
         self.cameras_list = sorted(os.listdir(os.path.join(image_dir, self.records_list[0])),
                                    reverse=not self.apollo_original_order)
 
+        self.matadata_road_dir = os.path.join('_metadata', road)
+
+
+        # Read all data
+        self.data = read_all_data(image_dir, pose_dir, self.records_list, self.cameras_list,
+                                  apollo_original_order=self.apollo_original_order)
+
+
+        # Check do we have train/val split
+        if self.train is not None:
+            trainval_split_dir = os.path.join(self.road_path, "trainval_split")
+            if not os.path.exists(trainval_split_dir):
+                # Check do we have our own split
+                print('we have our own splits')
+                trainval_split_dir = os.path.join(self.metadata_road_dir, "trainval_split")
+            else:
+                print('we have original splits')
+
+            if os.path.exists(trainval_split_dir):
+                # Have splits let's use them
+
+                self.train_split = read_original_splits(os.path.join(trainval_split_dir, 'train.txt'))
+                self.val_split = read_original_splits(os.path.join(trainval_split_dir, 'val.txt'))
+            else:
+                # Create our own splits
+                self.create_train_val_splits(trainval_split_dir, self.data)
+
+            """
+            if (os.path.exists(trainval_split_dir)
+                    and os.path.isdir(trainval_split_dir)):
+                # Have splits let's use them
+                # print('we have original splits')
+                self.train_split = read_original_splits(os.path.join(trainval_split_dir, 'train.txt'))
+                self.val_split = read_original_splits(os.path.join(trainval_split_dir, 'val.txt'))
+                # print('train_split = {}'.format(train_split))
+                # print('val_split = {}'.format(val_split))
+            else:
+                # Check do we have our own split
+                trainval_split_dir = os.path.join(self.metadata_road_dir, "trainval_split")
+                if (os.path.exists(trainval_split_dir)
+                        and os.path.isdir(trainval_split_dir)):
+                    # Found our own saved split
+                    self.train_split = read_original_splits(os.path.join(trainval_split_dir, 'train.txt'))
+                    self.val_split = read_original_splits(os.path.join(trainval_split_dir, 'val.txt'))
+
+                # Make our own splits and save them for later
+                print('we don\'t have original splits')
+            # train_samples_file = os.path.join(self.road_path, "trainval_split")
+            # image_dir = os.path.join(self.road_path, "ColorImage")
+            """
+
+
+        # Filter Train/Val
+        if self.train is not None:
+            def check_train_val(c1, c2):
+                print('c1 = {}'.format(c1))
+                print('c2 = {}'.format(c2))
+                return True
+            self.data = [r for r in self.data if check_train_val(r[0], r[2])]
+
+
+
+        """
         # iterate over all records and store it in internal data
         self.data = []
+        skipped_inc = 0
+        skipped_other = 0
         for i, r in enumerate(self.records_list):
             cam1s = sorted(glob.glob(os.path.join(image_dir, r, self.cameras_list[0], '*.jpg')),
                            reverse=not self.apollo_original_order)
@@ -204,24 +343,47 @@ class Apolloscape(Dataset):
                 if im1_part != im2_part:
                     # Non-consistent images, drop with the lowest time unit
                     # and repeat with the next idx
+                    skipped_inc += 1
                     if im1_part < im2_part:
                         c1_idx += 1
                     else:
                         c2_idx += 1
                 else:
-                    # Images has equal timing (filename prefix) so add them to data.
-                    item = []
-                    item.append(c1)
-                    item.append(pose1s[os.path.basename(c1)])
-                    item.append(c2)
-                    item.append(pose2s[os.path.basename(c2)])
-                    item.append(r)
-                    self.data.append(item)
+
+                    check_path1 = os.path.join(r, self.cameras_list[0],
+                            os.path.splitext(os.path.basename(c1))[0])
+                    check_path2 = os.path.join(r, self.cameras_list[1],
+                            os.path.splitext(os.path.basename(c2))[0])
+
+                    if ( self.check_test_val(check_path1)
+                            and self.check_test_val(check_path2)):
+                        # Images has equal timing (filename prefix) so add them to data.
+                        item = []
+                        item.append(c1)
+                        item.append(pose1s[os.path.basename(c1)])
+                        item.append(c2)
+                        item.append(pose2s[os.path.basename(c2)])
+                        item.append(r)
+                        self.data.append(item)
+
+                        # print('check1 = {}'.format(check1))
+                        # print(self.check_test_val(check1))
+                        # print('check2 = {}'.format(check2))
+                        # print(self.check_test_val(check2))
+                    else:
+                        skipped_other += 1
 
                     # Continue with the next pair of images
                     c1_idx += 1
                     c2_idx += 1
 
+        # Print stats
+        # print('{:05d} - added to data'.format(len(self.data)))
+        # print('{:05d} - skipped due to inconsistency'.format(skipped_inc))
+        # if self.train is not None:
+        #     print('{:05d} - skipped due to not in {}'.format(skipped_other,
+        #             'Train' if self.train else 'Val'))
+        """
 
         # Save for extracting poses directly
         self.data_array = np.array(self.data, dtype=object)
@@ -265,6 +427,25 @@ class Apolloscape(Dataset):
 #         print('all_poses.len = {}'.format(len(all_poses)))
 #         print('poses_poses = {}'.format(self.poses_mean))
 #         print('poses_std = {}'.format(self.poses_std))
+
+
+    def check_test_val(self, filename_path):
+        if self.train is not None:
+            fname = os.path.splitext(filename_path)[0]
+            if self.train:
+                return fname in self.train_split
+            else:
+                return fname in self.val_split
+        else:
+            return True
+
+    def create_train_val_splits(train_val_split_dir):
+        """Creates splits and saves it to ``train_val_split_dir``"""
+
+        if not os.path.exists(train_val_split_dir):
+            os.makedirs(train_val_split_dir)
+
+        # Make splits
 
     @property
     def data_array(self):
@@ -377,6 +558,7 @@ class Apolloscape(Dataset):
         fmt_str  = "Dataset: " + self.__class__.__name__ + "\n"
         fmt_str += "    Road: {}\n".format(self.road)
         fmt_str += "    Record: {}\n".format(self.record)
+        fmt_str += "    Train: {}\n".format(self.train)
         fmt_str += "    Length: {} of {}\n".format(self.__len__(), len(self.data))
         fmt_str += "    Normalize Poses: {}\n".format(self.normalize_poses)
         fmt_str += "    Cameras: {}\n".format(self.cameras_list)
