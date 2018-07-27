@@ -5,3 +5,4 @@ runs/
 .ipynb_checkpoints/
 __pycache__/
 _metadata
+_checkpoints
