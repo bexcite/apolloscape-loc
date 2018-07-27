@@ -4,7 +4,7 @@ import transforms3d.euler as txe
 import transforms3d.quaternions as txq
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
-from utils.common import calc_poses_params
+from utils.common import calc_poses_params, extract_translation
 from PIL import Image
 import os
 import glob
@@ -166,7 +166,7 @@ def process_poses(all_poses, pose_format='full-mat',
     poses_std = np.std(all_poses, axis=0)
 
     if normalize_poses:
-        print('Poses Normalized!')
+        # print('Poses Normalized!')
         if pose_format == 'quat':
             all_poses[:, :3] -= poses_mean[:3]
             all_poses[:, :3] = np.divide(all_poses[:, :3], poses_std[:3], where=poses_std[:3]!=0)
@@ -405,10 +405,12 @@ class Apolloscape(Dataset):
         """Get translation parts of the poses"""
         poses1 = self.data_array[:, 1]
         poses2 = self.data_array[:, 3]
-        if self.pose_format == 'full-mat':
-            poses1 = [p[:3, 3] for p in poses1]
-            poses2 = [p[:3, 3] for p in poses2]
-            return np.array(poses1), np.array(poses2)
+        # if self.pose_format == 'full-mat':
+        poses1 = [extract_translation(p, pose_format=self.pose_format) for p in poses1]
+
+        poses2 = [extract_translation(p, pose_format=self.pose_format) for p in poses2]
+        
+        return np.array(poses1), np.array(poses2)
         # TODO: Implement for otherd pose_format - 'quat', etc
 
     def all_poses(self):
@@ -418,12 +420,21 @@ class Apolloscape(Dataset):
         return poses1, poses2
 
     def get_poses_params(self, all_records=False):
-        """Returns min, max, mean and std values the poses"""
+        """Returns min, max, mean and std values the poses translations"""
         data_array = self.all_data_array if all_records else self.data_array
         poses1 = data_array[:, 1]
         poses2 = data_array[:, 3]
         all_poses = np.concatenate((poses1, poses2))
-        return calc_poses_params(all_poses)
+        return calc_poses_params(all_poses, pose_format=self.pose_format)
+
+
+    def get_records_counts(self):
+        data_array = self._data_array
+        recs_num = {}
+        for r in self.records_list:
+            n = np.sum(data_array[:, 4] == r)
+            recs_num[r] = n
+        return recs_num
 
 
 
@@ -479,8 +490,8 @@ class Apolloscape(Dataset):
         fmt_str += "    Road: {}\n".format(self.road)
         fmt_str += "    Record: {}\n".format(self.record)
         fmt_str += "    Train: {}\n".format(self.train)
-        fmt_str += "    Length: {} of {}\n".format(self.__len__(), len(self.data))
         fmt_str += "    Normalize Poses: {}\n".format(self.normalize_poses)
+        fmt_str += "    Length: {} of {}\n".format(self.__len__(), len(self.data))
         fmt_str += "    Cameras: {}\n".format(self.cameras_list)
         fmt_str += "    Records: {}\n".format(self.records_list)
         return fmt_str

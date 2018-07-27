@@ -2,11 +2,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation as manimation
+import torch
 from tqdm import tqdm
 from PIL import ImageFile
 import os
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True # it's important because not all images read without this
+
+# Show images
+def imshow(img, title=None):
+    img = img.numpy().transpose([1, 2, 0])
+    fig = plt.figure(figsize=(18, 18))
+    if title is not None:
+        plt.title(title)
+    plt.imshow(img)
+    plt.pause(0.001)
+
 
 def make_video(dataset, record=None, outfile=None):
     if record is not None:
@@ -115,10 +126,16 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None):
     draw_poses(ax3, mid_poses, proj=True, proj_z=int(p_min[2]))
 
     # Show current sample pose
-    mid_pose = 0.5 * (poses[0][:3, 3] + poses[1][:3, 3])
+    mid_pose = 0.5 * (extract_translation(poses[0], pose_format=dataset.pose_format)
+                + extract_translation(poses[1], pose_format=dataset.pose_format))
     draw_poses(ax3, [mid_pose], c='r', s=60, proj=True, proj_z=int(p_min[2]))
 
     # Show current sample camera images
+    if type(images[0]) == torch.Tensor:
+        images[0] = images[0].numpy().transpose([1, 2, 0])
+    if type(images[1]) == torch.Tensor:
+        images[1] = images[1].numpy().transpose([1, 2, 0])
+
     ax1.imshow(images[0])
     ax2.imshow(images[1])
 
@@ -163,13 +180,25 @@ def draw_poses_list(ax, poses_list):
     for poses in poses_list:
         draw_poses(ax, poses)
 
-def calc_poses_params(poses):
+
+def extract_translation(p, pose_format='full-mat'):
+    if pose_format == 'full-mat':
+        return p[0:3, 3]
+    elif pose_format == 'quat':
+        return p[:3]
+    else:
+        warnings.warn("pose_format should be either 'full-mat' or 'quat'")
+        return p
+
+
+def calc_poses_params(poses, pose_format='full-mat'):
     """Calculates min, max, mean and std of translations of the poses"""
+
     p = poses[0]
-    allp = p[0:3, 3]
+    allp = extract_translation(p, pose_format)
 
     for p in poses[1:]:
-        allp = np.vstack((allp, p[0:3, 3]))
+        allp = np.vstack((allp, extract_translation(p, pose_format)))
 
     p_min = np.min(allp, axis=0)
     p_max = np.max(allp, axis=0)
