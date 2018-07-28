@@ -10,6 +10,8 @@ import os
 import glob
 import csv
 import warnings
+import pickle
+import time
 
 
 def read_poses_dict(fname):
@@ -191,6 +193,19 @@ def get_rec_path(image_path):
     return cp
 
 
+def transforms_to_id(transforms):
+    tname = ''
+    for t in transforms.transforms:
+        # print(t.__class__.__name__)
+        if len(tname) > 0:
+            tname += '_'
+        tname += t.__class__.__name__
+        if t.__class__.__name__ == 'Resize':
+            tname += '_{}'.format(t.size)
+        if t.__class__.__name__ == 'CenterCrop':
+            tname += '_{}x{}'.format(t.size[0], t.size[1])
+    return tname
+
 
 class Apolloscape(Dataset):
     """Baidu Apolloscape dataset"""
@@ -198,7 +213,8 @@ class Apolloscape(Dataset):
     val_ratio = 0.25
 
     def __init__(self, root, road="road03_seg", transform=None, record=None,
-                 normalize_poses=False, pose_format='full-mat', train=None, paired=True):
+                 normalize_poses=False, pose_format='full-mat', train=None, paired=True,
+                 cache_transform=False):
         """
             Args:
                 root (string): Dataset directory
@@ -325,6 +341,13 @@ class Apolloscape(Dataset):
         self._data_array[:,1] = [x for x in all_poses_processed[:l]]
         self._data_array[:,3] = [x for x in all_poses_processed[l:]]
 
+        # Cache transform directory prepare
+        self.cache_transform = cache_transform
+        if self.cache_transform:
+            self.cache_transform_dir = \
+                os.path.join('_cache_transform', self.road, transforms_to_id(self.transform))
+            print('cache_transform_dir = {}'.format(self.cache_transform_dir))
+
 
     def check_test_val(self, filename_path):
         """Checks whether to add image file to dataset based on Train/Val setting
@@ -409,7 +432,7 @@ class Apolloscape(Dataset):
         poses1 = [extract_translation(p, pose_format=self.pose_format) for p in poses1]
 
         poses2 = [extract_translation(p, pose_format=self.pose_format) for p in poses2]
-        
+
         return np.array(poses1), np.array(poses2)
         # TODO: Implement for otherd pose_format - 'quat', etc
 
@@ -461,6 +484,52 @@ class Apolloscape(Dataset):
         return len(self.data_array)
 
 
+    def load_image_direct(self, image_path):
+        img = pil_loader(image_path)
+        if self.transform is not None:
+            img = self.transform(img)
+        return img
+
+
+    def load_image(self, image_path):
+
+        if (self.transform is not None
+                and self.cache_transform):
+            # Using cache
+            im_path_list = image_path.split(os.sep)
+            cache_dir = os.path.join(self.cache_transform_dir, os.sep.join(im_path_list[-3:-1]))
+            fname = im_path_list[-1] + '.pickle'
+            cache_im_path = os.path.join(cache_dir, fname)
+            if os.path.exists(cache_im_path):
+                # return cached
+                # print('returned cached fname = {}'.format(cache_im_path))
+                start_t = time.time()
+                with open(cache_im_path, 'rb') as cache_file:
+                    img = pickle.load(cache_file)
+                # print('T: cached hit = {:.3f}'.format(time.time() - start_t))
+                return img
+
+            start_t = time.time()
+            img = self.load_image_direct(image_path)
+
+            if not os.path.isdir(cache_dir):
+                os.makedirs(cache_dir)
+
+            with open(cache_im_path, 'wb') as cache_file:
+                pickle.dump(img, cache_file, pickle.HIGHEST_PROTOCOL)
+
+            # print('T: load_direct + store = {:.3f}'.format(time.time() - start_t))
+
+            return img
+
+        # Not using cache
+        start_t = time.time()
+        img = self.load_image_direct(image_path)
+        # print('T: load_direct = {:.3f}'.format(time.time() - start_t))
+
+        return img
+
+
     def __getitem__(self, idx):
 
         # If we have a record than work with filtered self.record_idxs
@@ -476,9 +545,7 @@ class Apolloscape(Dataset):
         images = []
         poses = []
         for im, pos in zip([0,2], [1,3]):
-            img = pil_loader(ditem[im])
-            if self.transform is not None:
-                img = self.transform(img)
+            img = self.load_image(ditem[im])
             images.append(img)
             npos = torch.from_numpy(ditem[pos])
             poses.append(npos.float())

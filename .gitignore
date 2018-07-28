@@ -6,3 +6,4 @@ runs/
 __pycache__/
 _metadata
 _checkpoints
+_cache_transform
