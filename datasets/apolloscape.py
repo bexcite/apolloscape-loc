@@ -288,16 +288,16 @@ class Apolloscape(Dataset):
             trainval_split_dir = os.path.join(self.road_path, "trainval_split")
             if not os.path.exists(trainval_split_dir):
                 # Check do we have our own split
-                print('check our own splits')
+#                 print('check our own splits')
                 trainval_split_dir = os.path.join(self.metadata_road_dir, "trainval_split")
                 if not os.path.exists(trainval_split_dir):
                     # Create our own splits
-                    print('create our splits')
+#                     print('create our splits')
                     self.create_train_val_splits(trainval_split_dir)
-                else:
-                    print('we have our splits')
-            else:
-                print('we have original splits')
+#                 else:
+#                     print('we have our splits')
+#             else:
+#                 print('we have original splits')
 
             self.train_split = read_original_splits(os.path.join(trainval_split_dir, 'train.txt'))
             self.val_split = read_original_splits(os.path.join(trainval_split_dir, 'val.txt'))
@@ -346,7 +346,7 @@ class Apolloscape(Dataset):
         if self.cache_transform:
             self.cache_transform_dir = \
                 os.path.join('_cache_transform', self.road, transforms_to_id(self.transform))
-            print('cache_transform_dir = {}'.format(self.cache_transform_dir))
+#             print('cache_transform_dir = {}'.format(self.cache_transform_dir))
 
 
     def check_test_val(self, filename_path):
@@ -495,6 +495,15 @@ class Apolloscape(Dataset):
 
         if (self.transform is not None
                 and self.cache_transform):
+            
+            # Split to tensor
+#             to_tensor = None
+#             head_transform = self.transform
+#             if head_transform.transforms[-1].__class__.__name__ == "ToTensor":
+#                 to_tensor = head_transform.transforms[-1]
+#                 head_transform = transforms.Compose(head_transform.transforms[:-1])
+
+            
             # Using cache
             im_path_list = image_path.split(os.sep)
             cache_dir = os.path.join(self.cache_transform_dir, os.sep.join(im_path_list[-3:-1]))
@@ -502,27 +511,42 @@ class Apolloscape(Dataset):
             cache_im_path = os.path.join(cache_dir, fname)
             if os.path.exists(cache_im_path):
                 # return cached
-                # print('returned cached fname = {}'.format(cache_im_path))
+#                 print('returned cached fname = {}'.format(cache_im_path))
                 start_t = time.time()
                 with open(cache_im_path, 'rb') as cache_file:
                     img = pickle.load(cache_file)
-                # print('T: cached hit = {:.3f}'.format(time.time() - start_t))
+#                 img = pil_loader(image_path)
+#                 print('T: cached hit pil_load = {:.3f}'.format(time.time() - start_t))
+#                 if to_tensor is not None:
+#                     img = to_tensor(img)
+#                 print('T: cached hit = {:.3f}'.format(time.time() - start_t))
                 return img
 
+            # First time direct load
             start_t = time.time()
             img = self.load_image_direct(image_path)
-
+            
+#             img = pil_loader(image_path)
+#             if head_transform is not None:
+#                 img = head_transform(img)
+                
+            # Store to cache
             if not os.path.isdir(cache_dir):
                 os.makedirs(cache_dir)
+                
+#             img.save(cache_im_path)
 
             with open(cache_im_path, 'wb') as cache_file:
                 pickle.dump(img, cache_file, pickle.HIGHEST_PROTOCOL)
 
-            # print('T: load_direct + store = {:.3f}'.format(time.time() - start_t))
+#             if to_tensor is not None:
+#                 img = to_tensor(img)
+
+#             print('T: load_direct + store = {:.3f}'.format(time.time() - start_t))
 
             return img
 
-        # Not using cache
+        # Not using cache at all
         start_t = time.time()
         img = self.load_image_direct(image_path)
         # print('T: load_direct = {:.3f}'.format(time.time() - start_t))

@@ -6,6 +6,7 @@ import torch
 from tqdm import tqdm
 from PIL import ImageFile
 import os
+from datetime import datetime
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True # it's important because not all images read without this
 
@@ -206,3 +207,48 @@ def calc_poses_params(poses, pose_format='full-mat'):
     p_std = np.std(allp, axis=0)
 
     return p_min, p_max, p_mean, p_std
+
+
+# Save checkpoint
+def save_checkpoint(model, optimizer, experiment_name='test', epoch=None):
+    tstr = datetime.now().strftime('%Y%m%d_%H%M%S')
+    fname = '{}_{}'.format(tstr, experiment_name)
+    if epoch is not None:
+        fname += '_e{:03d}'.format(epoch)
+    fname += '.pth.tar'
+    
+    checkpoints_dir = '_checkpoints'
+    if not os.path.exists(checkpoints_dir):
+        os.makedirs(checkpoints_dir)
+    
+    fname_path = os.path.join(checkpoints_dir, fname)
+#     print('fname_path = {}'.format(fname_path))
+    
+    checkpoint_dict = {
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optim_state_dict': optimizer.state_dict()
+    }
+    
+    torch.save(checkpoint_dict, fname_path)
+    
+    return fname_path
+    
+    print('Model saved to {}'.format(fname_path))
+
+
+class AverageMeter():
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+        
+    def update(self, value, n=1):
+        self.val = value
+        self.count += n
+        self.sum += value * n
+        self.avg = self.sum / self.count
