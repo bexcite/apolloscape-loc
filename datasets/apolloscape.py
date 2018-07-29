@@ -330,6 +330,14 @@ class Apolloscape(Dataset):
         l = len(all_poses_processed)//2
         self._data_array[:,1] = [x for x in all_poses_processed[:l]]
         self._data_array[:,3] = [x for x in all_poses_processed[l:]]
+        
+                
+        # Store poses mean/std to metadata
+        poses_stats_fname = 'pose_stats.txt'
+        if not os.path.exists(self.metadata_road_dir):
+            os.makedirs(self.metadata_road_dir)
+        poses_stats_path = os.path.join(self.metadata_road_dir, poses_stats_fname)
+        np.savetxt(poses_stats_path, (self.poses_mean, self.poses_std))
 
 
         # pp1, pp2 = self.poses_translations()
