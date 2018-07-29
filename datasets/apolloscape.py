@@ -144,6 +144,21 @@ def read_all_data(image_dir, pose_dir, records_list, cameras_list,
 
 def process_poses(all_poses, pose_format='full-mat',
                   normalize_poses=True):
+
+
+    print('process poses')
+
+
+    # Mean/Std for full-mat
+    # poses_mean = np.mean(all_poses[:, :3, 3], axis=0)
+    # poses_std = np.std(all_poses[:, :3, 3], axis=0)
+
+    # pose_format value here is the default(current) representation
+    _, _, poses_mean, poses_std = calc_poses_params(all_poses, pose_format='full-mat')
+    # print('poses_mean = {}'.format(poses_mean))
+    # print('poses_std = {}'.format(poses_std))
+
+
     # Default pose format is full-mat
     new_poses = all_poses
     if pose_format == 'quat':
@@ -164,17 +179,26 @@ def process_poses(all_poses, pose_format='full-mat',
 #                 print('new_poses[i] = {}'.format(new_poses[i]))
         all_poses = new_poses
 
-    poses_mean = np.mean(all_poses, axis=0)
-    poses_std = np.std(all_poses, axis=0)
+        # poses_mean = np.mean(all_poses[:, :3], axis=0)
+        # poses_std = np.std(all_poses[:, :3], axis=0)
+
+        # _, _, poses_mean, poses_std = calc_poses_params(all_poses, pose_format=pose_format)
+        # print('quat: poses_mean = {}'.format(poses_mean))
+        # print('quat: poses_std = {}'.format(poses_std))
+
 
     if normalize_poses:
-        # print('Poses Normalized!')
+        print('Poses Normalized! pose_format = {}'.format(pose_format))
         if pose_format == 'quat':
-            all_poses[:, :3] -= poses_mean[:3]
-            all_poses[:, :3] = np.divide(all_poses[:, :3], poses_std[:3], where=poses_std[:3]!=0)
+            # all_poses[:, :3] -= poses_mean[:3]
+            # all_poses[:, :3] = np.divide(all_poses[:, :3], poses_std[:3], where=poses_std[:3]!=0)
+            all_poses[:, :3] -= poses_mean
+            all_poses[:, :3] = np.divide(all_poses[:, :3], poses_std, where=poses_std!=0)
         else: # 'full-mat'
-            all_poses -= poses_mean
-            all_poses = np.divide(all_poses, poses_std, where=poses_std!=0)
+            all_poses[:, :3, 3] -= poses_mean
+            all_poses[:, :3, 3] = np.divide(all_poses[:, :3, 3], poses_std, where=poses_std!=0)
+
+    # print('all_poses samples = {}'.format(all_poses[:10]))
 
     return all_poses, poses_mean, poses_std
 
@@ -283,6 +307,36 @@ class Apolloscape(Dataset):
                                   apollo_original_order=self.apollo_original_order)
 
 
+        # Save for extracting poses directly
+        self.data_array = np.array(self.data, dtype=object)
+
+
+        # Calc mean and std
+        all_poses = np.empty((0, 4, 4))
+        for p in np.concatenate((self._data_array[:,1], self._data_array[:,3])):
+            all_poses = np.vstack((all_poses, np.expand_dims(p, axis=0)))
+
+#         print('poses_poses = {}'.format(self.poses_mean))
+#         print('poses_std = {}'.format(self.poses_std))
+
+        # Process and convert poses
+        all_poses_processed, poses_mean, poses_std = process_poses(all_poses,
+                pose_format=self.pose_format,
+                normalize_poses=self.normalize_poses)
+        self.poses_mean = poses_mean
+        self.poses_std = poses_std
+
+        # Reassign poses after processing
+        l = len(all_poses_processed)//2
+        self._data_array[:,1] = [x for x in all_poses_processed[:l]]
+        self._data_array[:,3] = [x for x in all_poses_processed[l:]]
+
+
+        # pp1, pp2 = self.poses_translations()
+        # print('pp1 = {}'.format(pp1[:2]))
+        # print('pp2 = {}'.format(pp2[:2]))
+
+
         # Check do we have train/val splits
         if self.train is not None:
             trainval_split_dir = os.path.join(self.road_path, "trainval_split")
@@ -312,34 +366,18 @@ class Apolloscape(Dataset):
                     result = result and self.check_test_val(cp)
                 return result
             self.data = [r for r in self.data if check_train_val(r[0], r[2])]
+            self._data_array = [r for r in self._data_array if check_train_val(r[0], r[2])]
+            # Save for extracting poses directly
+            self._data_array = np.array(self._data_array, dtype=object)
 
 
-        # Save for extracting poses directly
-        self.data_array = np.array(self.data, dtype=object)
-
+        # pp11, pp22 = self.poses_translations()
+        # print('pp11 = {}'.format(pp11[:2]))
+        # print('pp22 = {}'.format(pp22[:2]))
 
         # Used as a filter in __len__ and __getitem__
         self.record = record
 
-        # Calc mean and std
-        all_poses = np.empty((0, 4, 4))
-        for p in np.concatenate((self._data_array[:,1], self._data_array[:,3])):
-            all_poses = np.vstack((all_poses, np.expand_dims(p, axis=0)))
-
-#         print('poses_poses = {}'.format(self.poses_mean))
-#         print('poses_std = {}'.format(self.poses_std))
-
-        # Process and convert poses
-        all_poses_processed, poses_mean, poses_std = process_poses(all_poses,
-                pose_format=self.pose_format,
-                normalize_poses=self.normalize_poses)
-        self.poses_mean = poses_mean
-        self.poses_std = poses_std
-
-        # Reassign poses after processing
-        l = len(all_poses_processed)//2
-        self._data_array[:,1] = [x for x in all_poses_processed[:l]]
-        self._data_array[:,3] = [x for x in all_poses_processed[l:]]
 
         # Cache transform directory prepare
         self.cache_transform = cache_transform
@@ -428,13 +466,17 @@ class Apolloscape(Dataset):
         """Get translation parts of the poses"""
         poses1 = self.data_array[:, 1]
         poses2 = self.data_array[:, 3]
+
+        # print('=== poses translations = {}'.format(poses1[0]))
+
         # if self.pose_format == 'full-mat':
         poses1 = [extract_translation(p, pose_format=self.pose_format) for p in poses1]
 
         poses2 = [extract_translation(p, pose_format=self.pose_format) for p in poses2]
 
+
+
         return np.array(poses1), np.array(poses2)
-        # TODO: Implement for otherd pose_format - 'quat', etc
 
     def all_poses(self):
         """Get all poses list for all records in dataset"""
@@ -495,7 +537,7 @@ class Apolloscape(Dataset):
 
         if (self.transform is not None
                 and self.cache_transform):
-            
+
             # Split to tensor
 #             to_tensor = None
 #             head_transform = self.transform
@@ -503,7 +545,7 @@ class Apolloscape(Dataset):
 #                 to_tensor = head_transform.transforms[-1]
 #                 head_transform = transforms.Compose(head_transform.transforms[:-1])
 
-            
+
             # Using cache
             im_path_list = image_path.split(os.sep)
             cache_dir = os.path.join(self.cache_transform_dir, os.sep.join(im_path_list[-3:-1]))
@@ -525,15 +567,15 @@ class Apolloscape(Dataset):
             # First time direct load
             start_t = time.time()
             img = self.load_image_direct(image_path)
-            
+
 #             img = pil_loader(image_path)
 #             if head_transform is not None:
 #                 img = head_transform(img)
-                
+
             # Store to cache
             if not os.path.isdir(cache_dir):
                 os.makedirs(cache_dir)
-                
+
 #             img.save(cache_im_path)
 
             with open(cache_im_path, 'wb') as cache_file:

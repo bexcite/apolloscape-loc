@@ -114,9 +114,9 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None):
         idx, len(dataset)))
 
     # Set plot limits acc to selected poses
-    ax3.set_xlim(int(p_min[0]), int(p_max[0]) + 1)
-    ax3.set_ylim(int(p_min[1]), int(p_max[1]) + 1)
-    ax3.set_zlim(int(p_min[2]), int(p_max[2]) + 1)
+    ax3.set_xlim(int(p_min[0] - 1), int(p_max[0] + 1))
+    ax3.set_ylim(int(p_min[1] - 1), int(p_max[1] + 1))
+    ax3.set_zlim(int(p_min[2] - 1), int(p_max[2] + 1))
 
     # Show all poses for selected record
     poses1, poses2 = dataset.poses_translations()
@@ -124,12 +124,12 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None):
 
     # print('mid_poses = {}'.format(mid_poses))
 
-    draw_poses(ax3, mid_poses, proj=True, proj_z=int(p_min[2]))
+    draw_poses(ax3, mid_poses, proj=True, proj_z=int(p_min[2] - 1))
 
     # Show current sample pose
     mid_pose = 0.5 * (extract_translation(poses[0], pose_format=dataset.pose_format)
                 + extract_translation(poses[1], pose_format=dataset.pose_format))
-    draw_poses(ax3, [mid_pose], c='r', s=60, proj=True, proj_z=int(p_min[2]))
+    draw_poses(ax3, [mid_pose], c='r', s=60, proj=True, proj_z=int(p_min[2] - 1 ))
 
     # Show current sample camera images
     if type(images[0]) == torch.Tensor:
@@ -163,13 +163,16 @@ def draw_poses(ax, poses, c='b', s=20, proj=False, proj_z=0):
     for i, p in enumerate(poses):
         # coords[i] = p[:3, 3]
         coords[i] = p
-    ax.scatter(coords[:, 0], coords[:, 1], coords[:, 2], c=c, s=s)
 
+    # Draw projection
     if proj:
         if len(poses) > 1:
             ax.plot(coords[:, 0], coords[:, 1], proj_z, c='g')
         elif len(poses) == 1:
             ax.scatter(coords[:, 0], coords[:, 1], proj_z, c=c)
+
+    # Draw path
+    ax.scatter(coords[:, 0], coords[:, 1], coords[:, 2], c=c, s=s)
 
 #     XYZ = np.tile(np.array([0., 0., 0., 1.]).reshape(4, -1), 1)
 #         XYZp = np.matmul(p, XYZ)
@@ -216,37 +219,37 @@ def save_checkpoint(model, optimizer, experiment_name='test', epoch=None):
     if epoch is not None:
         fname += '_e{:03d}'.format(epoch)
     fname += '.pth.tar'
-    
+
     checkpoints_dir = '_checkpoints'
     if not os.path.exists(checkpoints_dir):
         os.makedirs(checkpoints_dir)
-    
+
     fname_path = os.path.join(checkpoints_dir, fname)
 #     print('fname_path = {}'.format(fname_path))
-    
+
     checkpoint_dict = {
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
         'optim_state_dict': optimizer.state_dict()
     }
-    
+
     torch.save(checkpoint_dict, fname_path)
-    
+
     return fname_path
-    
+
     print('Model saved to {}'.format(fname_path))
 
 
 class AverageMeter():
     def __init__(self):
         self.reset()
-    
+
     def reset(self):
         self.val = 0
         self.avg = 0
         self.sum = 0
         self.count = 0
-        
+
     def update(self, value, n=1):
         self.val = value
         self.count += n
