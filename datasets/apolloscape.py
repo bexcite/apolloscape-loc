@@ -146,7 +146,7 @@ def process_poses(all_poses, pose_format='full-mat',
                   normalize_poses=True):
 
 
-    print('process poses')
+#     print('process poses')
 
 
     # Mean/Std for full-mat
@@ -188,7 +188,7 @@ def process_poses(all_poses, pose_format='full-mat',
 
 
     if normalize_poses:
-        print('Poses Normalized! pose_format = {}'.format(pose_format))
+#         print('Poses Normalized! pose_format = {}'.format(pose_format))
         if pose_format == 'quat':
             # all_poses[:, :3] -= poses_mean[:3]
             # all_poses[:, :3] = np.divide(all_poses[:, :3], poses_std[:3], where=poses_std[:3]!=0)
