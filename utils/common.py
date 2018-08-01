@@ -159,10 +159,12 @@ def draw_poses(ax, poses, c='b', s=20, proj=False, proj_z=0):
         proj (bool): True if draw projection of a path on z-axis
         proj_z (float): Coord for z-projection
     """
-    coords = np.zeros((len(poses), 3))
-    for i, p in enumerate(poses):
-        # coords[i] = p[:3, 3]
-        coords[i] = p
+#     coords = np.zeros((len(poses), 3))
+#     for i, p in enumerate(poses):
+#         # coords[i] = p[:3, 3]
+#         coords[i] = p
+        
+    coords = np.array(poses)
 
     # Draw projection
     if proj:
