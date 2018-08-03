@@ -10,9 +10,23 @@ from datetime import datetime
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True # it's important because not all images read without this
 
+# Normalization params for pretrained models
+img_norm_mean=np.array([0.485, 0.456, 0.406])
+img_norm_std=np.array([0.229, 0.224, 0.225])
+
+def img_tensor_to_numpy(img, img_normalized=True):
+    if type(img) == torch.Tensor:
+        if img_normalized:
+            mean_t = torch.FloatTensor(img_norm_mean).view(3, 1, 1)
+            std_t = torch.FloatTensor(img_norm_std).view(3, 1, 1)
+            img = img * std_t + mean_t
+        img = img.cpu().numpy().transpose([1, 2, 0])
+    return img
+
 # Show images
 def imshow(img, title=None):
-    img = img.numpy().transpose([1, 2, 0])
+#     img = img.numpy().transpose([1, 2, 0])
+    img = img_tensor_to_numpy(img)
     fig = plt.figure(figsize=(18, 18))
     if title is not None:
         plt.title(title)
@@ -64,7 +78,7 @@ def make_video(dataset, record=None, outfile=None):
     print("Video saved successfully!")
 
 
-def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None):
+def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, img_normalized=True):
     # Save current dataset's record and restore it later
     if record is not None and restore_record:
         saved_rec = dataset.record
@@ -132,13 +146,15 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None):
     draw_poses(ax3, [mid_pose], c='r', s=60, proj=True, proj_z=int(p_min[2] - 1 ))
 
     # Show current sample camera images
-    if type(images[0]) == torch.Tensor:
-        images[0] = images[0].numpy().transpose([1, 2, 0])
-    if type(images[1]) == torch.Tensor:
-        images[1] = images[1].numpy().transpose([1, 2, 0])
+#     if type(images[0]) == torch.Tensor:
+#         images[0] = images[0].numpy().transpose([1, 2, 0])
+#     if type(images[1]) == torch.Tensor:
+#         images[1] = images[1].numpy().transpose([1, 2, 0])
 
-    ax1.imshow(images[0])
-    ax2.imshow(images[1])
+#     ax1.imshow(images[0])
+#     ax2.imshow(images[1])
+    ax1.imshow(img_tensor_to_numpy(images[0], img_normalized=img_normalized))
+    ax2.imshow(img_tensor_to_numpy(images[1], img_normalized=img_normalized))
 
 
     # Restore record if it was custom
@@ -159,13 +175,11 @@ def draw_poses(ax, poses, c='b', s=20, proj=False, proj_z=0):
         proj (bool): True if draw projection of a path on z-axis
         proj_z (float): Coord for z-projection
     """
-#     coords = np.zeros((len(poses), 3))
-#     for i, p in enumerate(poses):
-#         # coords[i] = p[:3, 3]
-#         coords[i] = p
-        
-    coords = np.array(poses)
-
+    coords = np.zeros((len(poses), 3))
+    for i, p in enumerate(poses):
+        # coords[i] = p[:3, 3]
+        coords[i] = p
+    
     # Draw projection
     if proj:
         if len(poses) > 1:

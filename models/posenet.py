@@ -16,6 +16,12 @@ class PoseNet(torch.nn.Module):
         # Rotation in quaternions
         self.fc_quat = torch.nn.Linear(num_features, 4)
         
+        # Turns off track_running_stats for BatchNorm layers,
+        # it simplifies testing on small datasets due to eval()/train() differences
+        for m in self.modules():
+            if isinstance(m, torch.nn.BatchNorm2d):
+                m.track_running_stats = False
+        
     def forward(self, x):
         # x is batch_images [batch_size x image, batch_size x image]
         
@@ -50,6 +56,8 @@ class PoseNetCriterion(torch.nn.Module):
                 # Rotation loss
                 loss += self.loss_fn(x[i][:, 3:], y[i][:, 3:])
         else:
-            loss += self.loss_fn(x[:, :3], y[:, :3])
-            loss += self.loss_fn(x[:, 3:], y[:, 3:])
+            loss += self.loss_fn(x[0], y[0])
+            loss += self.loss_fn(x[1], y[1])
+#         print('x = \n{}'.format(x[0]))
+#         print('y = \n{}'.format(y[0]))
         return loss
