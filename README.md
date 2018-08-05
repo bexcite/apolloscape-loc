@@ -26,6 +26,8 @@ Sample data file for `zpark` road provided in localization challenge section sup
 
 See roads and record graphs in [Apolloscape_View_Records Notebook](./Apolloscape_View_Records.ipynb)
 
+PoseNet training, error calculation and result visualization in [Apolloscape_PoseNet](./Apolloscape_PoseNet.ipynb)
+
 # Show/Save path and sample images by record id
 
 ```
@@ -43,8 +45,9 @@ python plot_dataset.py --data ./data/apolloscape --road road03_seg --record Reco
 ![Record video](./assets/road03_seg_Record018.gif)
 
 # TODO:
-* Train/Val handling
-* PoseNet implementation
+* PoseNet with automatic weights learning
+* Prepare data for [eval script](https://github.com/ApolloScapeAuto/dataset-api/tree/master/self_localization)
+* VidLoc implementation
 * WGAN for generating new samples
 * SfM for 3D map
 * Qt/OpenGL visualizations
