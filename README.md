@@ -28,6 +28,8 @@ See roads and record graphs in [Apolloscape_View_Records Notebook](./Apolloscape
 
 PoseNet training, error calculation and result visualization in [Apolloscape_PoseNet](./Apolloscape_PoseNet.ipynb)
 
+![PoseNet on Train](./assets/posenet_2048_train.png)
+
 # Show/Save path and sample images by record id
 
 ```
