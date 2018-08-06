@@ -149,12 +149,9 @@ def process_poses(all_poses, pose_format='full-mat',
 #     print('process poses')
 
 
-    # Mean/Std for full-mat
-    # poses_mean = np.mean(all_poses[:, :3, 3], axis=0)
-    # poses_std = np.std(all_poses[:, :3, 3], axis=0)
-
     # pose_format value here is the default(current) representation
     _, _, poses_mean, poses_std = calc_poses_params(all_poses, pose_format='full-mat')
+    
     # print('poses_mean = {}'.format(poses_mean))
     # print('poses_std = {}'.format(poses_std))
 
@@ -179,19 +176,10 @@ def process_poses(all_poses, pose_format='full-mat',
 #                 print('new_poses[i] = {}'.format(new_poses[i]))
         all_poses = new_poses
 
-        # poses_mean = np.mean(all_poses[:, :3], axis=0)
-        # poses_std = np.std(all_poses[:, :3], axis=0)
-
-        # _, _, poses_mean, poses_std = calc_poses_params(all_poses, pose_format=pose_format)
-        # print('quat: poses_mean = {}'.format(poses_mean))
-        # print('quat: poses_std = {}'.format(poses_std))
-
 
     if normalize_poses:
 #         print('Poses Normalized! pose_format = {}'.format(pose_format))
         if pose_format == 'quat':
-            # all_poses[:, :3] -= poses_mean[:3]
-            # all_poses[:, :3] = np.divide(all_poses[:, :3], poses_std[:3], where=poses_std[:3]!=0)
             all_poses[:, :3] -= poses_mean
             all_poses[:, :3] = np.divide(all_poses[:, :3], poses_std, where=poses_std!=0)
         else: # 'full-mat'
@@ -356,10 +344,6 @@ class Apolloscape(Dataset):
                     # Create our own splits
 #                     print('create our splits')
                     self.create_train_val_splits(trainval_split_dir)
-#                 else:
-#                     print('we have our splits')
-#             else:
-#                 print('we have original splits')
 
             self.train_split = read_original_splits(os.path.join(trainval_split_dir, 'train.txt'))
             self.val_split = read_original_splits(os.path.join(trainval_split_dir, 'val.txt'))
@@ -546,14 +530,6 @@ class Apolloscape(Dataset):
         if (self.transform is not None
                 and self.cache_transform):
 
-            # Split to tensor
-#             to_tensor = None
-#             head_transform = self.transform
-#             if head_transform.transforms[-1].__class__.__name__ == "ToTensor":
-#                 to_tensor = head_transform.transforms[-1]
-#                 head_transform = transforms.Compose(head_transform.transforms[:-1])
-
-
             # Using cache
             im_path_list = image_path.split(os.sep)
             cache_dir = os.path.join(self.cache_transform_dir, os.sep.join(im_path_list[-3:-1]))
@@ -565,34 +541,19 @@ class Apolloscape(Dataset):
                 start_t = time.time()
                 with open(cache_im_path, 'rb') as cache_file:
                     img = pickle.load(cache_file)
-#                 img = pil_loader(image_path)
-#                 print('T: cached hit pil_load = {:.3f}'.format(time.time() - start_t))
-#                 if to_tensor is not None:
-#                     img = to_tensor(img)
-#                 print('T: cached hit = {:.3f}'.format(time.time() - start_t))
                 return img
 
             # First time direct load
             start_t = time.time()
             img = self.load_image_direct(image_path)
 
-#             img = pil_loader(image_path)
-#             if head_transform is not None:
-#                 img = head_transform(img)
 
             # Store to cache
             if not os.path.isdir(cache_dir):
                 os.makedirs(cache_dir)
 
-#             img.save(cache_im_path)
-
             with open(cache_im_path, 'wb') as cache_file:
                 pickle.dump(img, cache_file, pickle.HIGHEST_PROTOCOL)
-
-#             if to_tensor is not None:
-#                 img = to_tensor(img)
-
-#             print('T: load_direct + store = {:.3f}'.format(time.time() - start_t))
 
             return img
 

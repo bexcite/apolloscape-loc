@@ -145,12 +145,6 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, 
                 + extract_translation(poses[1], pose_format=dataset.pose_format))
     draw_poses(ax3, [mid_pose], c='r', s=60, proj=True, proj_z=int(p_min[2] - 1 ))
 
-    # Show current sample camera images
-#     if type(images[0]) == torch.Tensor:
-#         images[0] = images[0].numpy().transpose([1, 2, 0])
-#     if type(images[1]) == torch.Tensor:
-#         images[1] = images[1].numpy().transpose([1, 2, 0])
-
 #     ax1.imshow(images[0])
 #     ax2.imshow(images[1])
     ax1.imshow(img_tensor_to_numpy(images[0], img_normalized=img_normalized))
@@ -164,7 +158,7 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, 
     return fig
 
 
-def draw_poses(ax, poses, c='b', s=20, proj=False, proj_z=0):
+def draw_poses(ax, poses, c='b', s=20, proj=False, proj_z=0, pose_format='quat'):
     """Draws the list of poses.
 
     Args:
@@ -178,7 +172,8 @@ def draw_poses(ax, poses, c='b', s=20, proj=False, proj_z=0):
     coords = np.zeros((len(poses), 3))
     for i, p in enumerate(poses):
         # coords[i] = p[:3, 3]
-        coords[i] = p
+        # coords[i] = p
+        coords[i] = extract_translation(p, pose_format=pose_format)
     
     # Draw projection
     if proj:
@@ -189,10 +184,6 @@ def draw_poses(ax, poses, c='b', s=20, proj=False, proj_z=0):
 
     # Draw path
     ax.scatter(coords[:, 0], coords[:, 1], coords[:, 2], c=c, s=s)
-
-#     XYZ = np.tile(np.array([0., 0., 0., 1.]).reshape(4, -1), 1)
-#         XYZp = np.matmul(p, XYZ)
-#         ax.scatter(XYZp[0], XYZp[1], XYZp[2], c=c, s=s)
 
 
 def draw_poses_list(ax, poses_list):
@@ -255,6 +246,22 @@ def save_checkpoint(model, optimizer, experiment_name='test', epoch=None):
 
     print('Model saved to {}'.format(fname_path))
 
+    
+def quaternion_angular_error(q1, q2):
+    """
+    angular error between two quaternions
+    :param q1: (4, )
+    :param q2: (4, )
+    :return:
+    """
+    d = abs(np.dot(q1, q2))
+    abs_q1 = np.linalg.norm(q1)
+    abs_q2 = np.linalg.norm(q2)
+    d = d / (abs_q1 * abs_q2)
+    d = min(1.0, max(-1.0, d))
+    theta = 2 * np.arccos(d) * 180 / np.pi
+    return theta
+    
 
 class AverageMeter():
     def __init__(self):
