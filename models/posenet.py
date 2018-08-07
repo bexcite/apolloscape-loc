@@ -64,7 +64,8 @@ class PoseNetCriterion(torch.nn.Module):
             loss += self.loss_fn(x[:, :3], y[:, :3])
 
             # Rotation loss
-            p_norm = torch.norm(x[:, 3:])
+            # p_norm = torch.norm(x[:, 3:])
+            p_norm = 1.0
             loss += self.loss_fn(x[:, 3:]/p_norm, y[:, 3:])
 #         print('x = \n{}'.format(x[0]))
 #         print('y = \n{}'.format(y[0]))
