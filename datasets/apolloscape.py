@@ -151,7 +151,7 @@ def process_poses(all_poses, pose_format='full-mat',
 
     # pose_format value here is the default(current) representation
     _, _, poses_mean, poses_std = calc_poses_params(all_poses, pose_format='full-mat')
-    
+
     # print('poses_mean = {}'.format(poses_mean))
     # print('poses_std = {}'.format(poses_std))
 
@@ -226,7 +226,7 @@ class Apolloscape(Dataset):
 
     def __init__(self, root, road="road03_seg", transform=None, record=None,
                  normalize_poses=False, pose_format='full-mat', train=None, paired=True,
-                 cache_transform=False):
+                 cache_transform=False, stereo=True):
         """
             Args:
                 root (string): Dataset directory
@@ -291,6 +291,7 @@ class Apolloscape(Dataset):
 
 
         # Read all data
+        # TODO: Add stereo param (data - 3 or 5)
         self.data = read_all_data(image_dir, pose_dir, self.records_list, self.cameras_list,
                                   apollo_original_order=self.apollo_original_order)
 
@@ -300,6 +301,7 @@ class Apolloscape(Dataset):
 
 
         # Calc mean and std
+        # TODO: Handle data 3 or 5
         all_poses = np.empty((0, 4, 4))
         for p in np.concatenate((self._data_array[:,1], self._data_array[:,3])):
             all_poses = np.vstack((all_poses, np.expand_dims(p, axis=0)))
@@ -315,11 +317,12 @@ class Apolloscape(Dataset):
         self.poses_std = poses_std
 
         # Reassign poses after processing
+        # TODO: data 3 or 5
         l = len(all_poses_processed)//2
         self._data_array[:,1] = [x for x in all_poses_processed[:l]]
         self._data_array[:,3] = [x for x in all_poses_processed[l:]]
-        
-                
+
+
         # Store poses mean/std to metadata
         poses_stats_fname = 'pose_stats.txt'
         if not os.path.exists(self.metadata_road_dir):
@@ -350,6 +353,7 @@ class Apolloscape(Dataset):
 
 
         # Filter Train/Val
+        # TODO: Data 3 or 5
         if self.train is not None:
             def check_train_val(*args):
                 result = True
@@ -406,6 +410,7 @@ class Apolloscape(Dataset):
         l = int(len(self.data) * (1 - self.val_ratio))
 
         # Save train.txt
+        # TODO: data 3 or 5
         with open(os.path.join(trainval_split_dir, 'train.txt'), 'w') as f:
             for s in self.data[:l]:
                 f.write('{}\n'.format(get_rec_path(s[0])))
@@ -413,6 +418,7 @@ class Apolloscape(Dataset):
         # print('saved to {}'.format(os.path.join(trainval_split_dir, 'train.txt')))
 
         # Save val.txt
+        # TODO: data 3 or 5
         with open(os.path.join(trainval_split_dir, 'val.txt'), 'w') as f:
             for s in self.data[l:]:
                 f.write('{}\n'.format(get_rec_path(s[0])))
@@ -448,12 +454,14 @@ class Apolloscape(Dataset):
             self.record_idxs = self.get_record_idxs(self._record)
 
 
+    # TODO: data 3 or 5 - track usage
     def poses(self):
         """Get poses list filtered by current record"""
         poses1 = self.data_array[:, 1]
         poses2 = self.data_array[:, 3]
         return poses1, poses2
 
+    # TODO: data 3 or 5 - track usage
     def poses_translations(self):
         """Get translation parts of the poses"""
         poses1 = self.data_array[:, 1]
@@ -466,16 +474,16 @@ class Apolloscape(Dataset):
 
         poses2 = [extract_translation(p, pose_format=self.pose_format) for p in poses2]
 
-
-
         return np.array(poses1), np.array(poses2)
 
+    # TODO: Data 3 or 5 - track usage
     def all_poses(self):
         """Get all poses list for all records in dataset"""
         poses1 = self.all_data_array[:, 1]
         poses2 = self.all_data_array[:, 3]
         return poses1, poses2
 
+    # TODO: Data 3 or 5 - track usage
     def get_poses_params(self, all_records=False):
         """Returns min, max, mean and std values the poses translations"""
         data_array = self.all_data_array if all_records else self.data_array
@@ -484,7 +492,7 @@ class Apolloscape(Dataset):
         all_poses = np.concatenate((poses1, poses2))
         return calc_poses_params(all_poses, pose_format=self.pose_format)
 
-
+    # TODO: Data 3 or 5 - check indexes
     def get_records_counts(self):
         data_array = self._data_array
         recs_num = {}
@@ -494,7 +502,7 @@ class Apolloscape(Dataset):
         return recs_num
 
 
-
+    # TODO: Data 3 or 5 - check indexes
     def get_record_idxs(self, record):
         """Returns idxs array for provided record."""
         if self.data_array is None:
@@ -564,7 +572,7 @@ class Apolloscape(Dataset):
 
         return img
 
-
+    # TODO: Data 3 or 5 - support modes
     def __getitem__(self, idx):
 
         # If we have a record than work with filtered self.record_idxs

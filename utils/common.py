@@ -34,6 +34,7 @@ def imshow(img, title=None):
     plt.pause(0.001)
 
 
+# TODO: Stereo=False mode support
 def make_video(dataset, record=None, outfile=None):
     if record is not None:
         dataset.record = record
@@ -78,6 +79,7 @@ def make_video(dataset, record=None, outfile=None):
     print("Video saved successfully!")
 
 
+# TODO: Stereo=False mode support
 def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, img_normalized=True):
     # Save current dataset's record and restore it later
     if record is not None and restore_record:
@@ -236,6 +238,7 @@ def extract_translation(p, pose_format='full-mat'):
 def calc_poses_params(poses, pose_format='full-mat'):
     """Calculates min, max, mean and std of translations of the poses"""
 
+    # TODO: Make normal loop and use empty
     p = poses[0]
     allp = extract_translation(p, pose_format)
 

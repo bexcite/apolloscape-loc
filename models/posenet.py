@@ -22,6 +22,7 @@ class PoseNet(torch.nn.Module):
             if isinstance(m, torch.nn.BatchNorm2d):
                 m.track_running_stats = False
 
+    # TODO: Not Stereo mode support
     def forward(self, x):
         # x is batch_images [batch_size x image, batch_size x image]
 
@@ -66,7 +67,7 @@ class PoseNetCriterion(torch.nn.Module):
             # Rotation loss
             # p_norm = torch.norm(x[:, 3:])
             p_norm = 1.0
-            loss += self.loss_fn(x[:, 3:]/p_norm, y[:, 3:])
+            loss += self.beta * self.loss_fn(x[:, 3:]/p_norm, y[:, 3:])
 #         print('x = \n{}'.format(x[0]))
 #         print('y = \n{}'.format(y[0]))
         return loss
