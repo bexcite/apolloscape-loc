@@ -174,7 +174,7 @@ def draw_poses(ax, poses, c='b', s=20, proj=False, proj_z=0, pose_format='quat')
         # coords[i] = p[:3, 3]
         # coords[i] = p
         coords[i] = extract_translation(p, pose_format=pose_format)
-    
+
     # Draw projection
     if proj:
         if len(poses) > 1:
@@ -190,6 +190,37 @@ def draw_poses_list(ax, poses_list):
     """Draw list of lists of poses. Use to draw several paths."""
     for poses in poses_list:
         draw_poses(ax, poses)
+
+
+def set_3d_axes_limits(ax, poses, pose_format='quat'):
+    p_min, p_max, p_mean, p_std = calc_poses_params(poses, pose_format=pose_format)
+    ax.set_xlim(p_min[0], p_max[0])
+    ax.set_ylim(p_min[1], p_max[1])
+    ax.set_zlim(int(p_min[2] - 1), p_max[2])
+    return p_min, p_max, p_mean, p_std
+
+def draw_pred_gt_poses(pred_poses, gt_poses):
+    fig = plt.figure(figsize=(8, 8))
+    ax = plt.axes(projection='3d')
+
+    ax.set_xlabel('$X$')
+    ax.set_ylabel('$Y$')
+    ax.set_zlabel('$Z$')
+    ax.view_init(50, 30)
+
+    all_poses = np.concatenate((pred_poses, gt_poses))
+    p_min, _, _, _ = set_3d_axes_limits(ax, all_poses, pose_format='quat')
+
+    draw_poses(ax, pred_poses[:, :3], proj=False, proj_z=int(p_min[2] - 1), c='r', s=60)
+    draw_poses(ax, gt_poses[:, :3], proj=True, proj_z=int(p_min[2] - 1), c='b', s=60)
+    for i in range(pred_poses.shape[0]):
+        pp = pred_poses[i, :3]
+        gp = gt_poses[i, :3]
+        pps = np.vstack((pp, gp))
+        ax.plot(pps[:, 0], pps[:, 1], pps[:, 2], c=(0.7, 0.7, 0.7, 0.4))
+
+    plt.draw()
+
 
 
 def extract_translation(p, pose_format='full-mat'):
@@ -220,9 +251,11 @@ def calc_poses_params(poses, pose_format='full-mat'):
 
 
 # Save checkpoint
-def save_checkpoint(model, optimizer, experiment_name='test', epoch=None):
-    tstr = datetime.now().strftime('%Y%m%d_%H%M%S')
-    fname = '{}_{}'.format(tstr, experiment_name)
+def save_checkpoint(model, optimizer, experiment_name='test', epoch=None,
+                    time_str=None):
+    if not time_str:
+        time_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+    fname = '{}_{}'.format(time_str, experiment_name)
     if epoch is not None:
         fname += '_e{:03d}'.format(epoch)
     fname += '.pth.tar'
@@ -244,9 +277,9 @@ def save_checkpoint(model, optimizer, experiment_name='test', epoch=None):
 
     return fname_path
 
-    print('Model saved to {}'.format(fname_path))
 
-    
+
+
 def quaternion_angular_error(q1, q2):
     """
     angular error between two quaternions
@@ -261,7 +294,7 @@ def quaternion_angular_error(q1, q2):
     d = min(1.0, max(-1.0, d))
     theta = 2 * np.arccos(d) * 180 / np.pi
     return theta
-    
+
 
 class AverageMeter():
     def __init__(self):
