@@ -54,10 +54,22 @@ def get_args():
                         help="Checkpoint file to restore model and optimizer parameters from")
     parser.add_argument("--checkpoint-save", metavar="EPOCH_NUM", type=int, default=100,
                         help="Save checkpoint every EPOCH_NUM epochs. (default: 100)")
-    parser.add_argument("--fig-save", metavar="EPOCH_NUM", type=int, default=100,
-                        help="Save pred/gt figure on training dataset every EPOCH_NUM epochs. (default: 100)")
+    parser.add_argument("--fig-save", metavar="EPOCH_NUM", type=int, default=0,
+                        help="Save pred/gt figure on training dataset every EPOCH_NUM epochs. \
+                            (default: 0 = don't save)")
     parser.add_argument("--epochs", metavar="NUM_EPOCHS", type=int, default=1,
                         help="Number of epochs to train the model. (default: 1)")
+    parser.add_argument("--val-freq", metavar="VAL_FREQ", type=int, default=5,
+                        help="Validation frequency every VAL_FREQ epochs. (default: 5)")
+    parser.add_argument("--log-freq", metavar="LOG_FREQ", type=int, default=0,
+                        help="Log frequency during training and validation every LOG_FREQ batch. \
+                        (default: 0 - once per epoch)")
+    parser.add_argument("--batch-size", metavar="BATCH_SIZE", type=int, default=40,
+                        help="Batch size. \
+                        (default: 40 - fits in most cases on GPU)")
+    parser.add_argument("--lr", metavar="LR", type=float, default=1e-4,
+                        help="Learning rate. \
+                        (default: 1e-4)")
     parser.add_argument("--experiment", metavar="EXP_NAME", type=str, default='run',
                         help="Experiment name")
     parser.add_argument("--feature-net", metavar="FEATURE_NETWORK_NAME", default="resnet18",
@@ -99,8 +111,6 @@ def main():
     ])
 
 
-
-
     train_record = None # 'Record001'
     train_dataset = Apolloscape(root=args.data, road=args.road,
         transform=transform, record=train_record, normalize_poses=True,
@@ -118,8 +128,8 @@ def main():
 
     shuffle_data = True
 
-    train_dataloader = DataLoader(train_dataset, batch_size=2, shuffle=shuffle_data) # batch_size = 75
-    val_dataloader = DataLoader(val_dataset, batch_size=2, shuffle=shuffle_data) # batch_size = 75
+    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=shuffle_data) # batch_size = 75
+    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=shuffle_data) # batch_size = 75
 
     # Get mean and std from dataset
     poses_mean = val_dataset.poses_mean
@@ -158,7 +168,7 @@ def main():
     criterion = PoseNetCriterion(stereo=True, beta=200.0)
 
     # Create optimizer
-    optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=0.0005)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.0005)
 
     start_epoch = 0
 
@@ -177,21 +187,22 @@ def main():
     n_epochs = start_epoch + args.epochs
 
     print('\nTraining ...')
-    val_freq = 5
+    val_freq = args.val_freq
     for e in range(start_epoch, n_epochs):
 
         # Train for one epoch
-        train(train_dataloader, model, criterion, optimizer, e, n_epochs, log_freq=1,
-             poses_mean=train_dataset.poses_mean, poses_std=train_dataset.poses_std,
-             device=device)
+        train(train_dataloader, model, criterion, optimizer, e, n_epochs,
+              log_freq=args.log_freq, poses_mean=train_dataset.poses_mean,
+              poses_std=train_dataset.poses_std, device=device)
 
         # Run validation loop
         if e > 0 and e % val_freq == 0:
             end = time.time()
-            validate(val_dataloader, model, criterion, e, log_freq=1,
-                device=device)
+            validate(val_dataloader, model, criterion, e, log_freq=args.log_freq,
+                    device=device)
 
-        if e > 0 and e % args.fig_save == 0:
+        # Make figure
+        if e > 0 and args.fig_save > 0 and e % args.fig_save == 0:
             exp_name = '{}_{}'.format(time_str, experiment_name)
             make_figure(model, train_dataloader, poses_mean=poses_mean,
                     poses_std=poses_std, epoch=e,
@@ -269,10 +280,6 @@ def make_checkpoint(model, optimizer, epoch=None, time_str=None, args=None):
 
 def make_figure(model, dataloader, poses_mean=None, poses_std=None,
         epoch=None, experiment_name=None, device='cpu'):
-
-    print(' >>>>>>>>>>>>>>>>>>> Make Figure')
-    print(' >>>>>>>>>>>>>>>>>>> Make Figure')
-    print(' >>>>>>>>>>>>>>>>>>> Make Figure')
 
     pred_poses, gt_poses = model_results_pred_gt(model, dataloader,
             poses_mean, poses_std, device=device)

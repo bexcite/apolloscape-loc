@@ -63,8 +63,8 @@ def train(train_loader, model, criterion, optimizer, epoch, max_epoch, log_freq=
                    epoch, max_epoch - 1, idx, len(train_loader) - 1,
                    batch_time=batch_time, data_time=data_time, losses=losses))
 
-        if idx == 0:
-            break
+        # if idx == 0:
+        #     break
 
 
     # un-normalize translation
@@ -125,8 +125,8 @@ def validate(val_loader, model, criterion, epoch, log_freq=1, print_sum=True, de
                       'Avg Loss: {losses.avg:.3f}'.format(
                        epoch, batch_time=batch_time, data_time=data_time, losses=losses))
 
-            if idx == 0:
-                break
+            # if idx == 0:
+            #     break
 
 
     if print_sum:
@@ -161,8 +161,8 @@ def model_results_pred_gt(model, dataloader, poses_mean=None, poses_std=None, de
         gt_poses = np.vstack((gt_poses, *batch_poses))
         pred_poses = np.vstack((pred_poses, *out))
 
-        if idx == 0:
-            break
+        # if idx == 0:
+        #     break
 
     # un-normalize translation
     unnorm = (poses_mean is not None) and (poses_std is not None)
