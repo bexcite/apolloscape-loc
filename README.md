@@ -47,9 +47,11 @@ python plot_dataset.py --data ./data/apolloscape --road road03_seg --record Reco
 ![Record video](./assets/road03_seg_Record018.gif)
 
 # TODO:
+* implement `stereo=False` mode and train on not filtered data
 * PoseNet with automatic weights learning
-* Prepare data for [eval script](https://github.com/ApolloScapeAuto/dataset-api/tree/master/self_localization)
 * VidLoc implementation
+* [Optional] Prepare data for [eval script](https://github.com/ApolloScapeAuto/dataset-api/tree/master/self_localization)
+* SfM / 3D Reconstruction pipeline
 * WGAN for generating new samples
 * SfM for 3D map
 * Qt/OpenGL visualizations
