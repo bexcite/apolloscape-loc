@@ -81,7 +81,7 @@ def check_stereo_paths_consistency(c1, c2):
 
 
 def read_all_data(image_dir, pose_dir, records_list, cameras_list,
-        apollo_original_order=False):
+        apollo_original_order=False, stereo=True):
     # iterate over all records and store it in internal data
     data = []
     skipped_inc = 0
@@ -110,7 +110,7 @@ def read_all_data(image_dir, pose_dir, records_list, cameras_list,
             im1_part = '_'.join(im1[:2])
             im2_part = '_'.join(im2[:2])
 
-            if im1_part != im2_part:
+            if stereo and im1_part != im2_part:
                 # Non-consistent images, drop with the lowest time unit
                 # and repeat with the next idx
                 skipped_inc += 1
@@ -121,13 +121,12 @@ def read_all_data(image_dir, pose_dir, records_list, cameras_list,
             else:
 
                 # Images has equal timing (filename prefix) so add them to data.
-                item = []
-                item.append(c1)
-                item.append(pose1s[os.path.basename(c1)])
-                item.append(c2)
-                item.append(pose2s[os.path.basename(c2)])
-                item.append(r)
-                data.append(item)
+                if stereo:
+                    data.append([c1, pose1s[os.path.basename(c1)],
+                                 c2, pose2s[os.path.basename(c2)], r])
+                else:
+                    data.append([c1, pose1s[os.path.basename(c1)], r])                    
+                    data.append([c2, pose2s[os.path.basename(c2)], r])
 
                 # print('check1 = {}'.format(check1))
                 # print(self.check_test_val(check1))
@@ -248,6 +247,7 @@ class Apolloscape(Dataset):
         self.pose_format = pose_format
         self.train = train
         self.apollo_original_order = True
+        self.stereo = stereo
 
         # Resolve image dir
         image_dir = os.path.join(self.road_path, "ColorImage")
@@ -291,9 +291,12 @@ class Apolloscape(Dataset):
 
 
         # Read all data
-        # TODO: Add stereo param (data - 3 or 5)
+        # TODO: [TEST] Add stereo param (data - 3 or 5)
         self.data = read_all_data(image_dir, pose_dir, self.records_list, self.cameras_list,
-                                  apollo_original_order=self.apollo_original_order)
+                                  apollo_original_order=self.apollo_original_order,
+                                  stereo=self.stereo)
+        
+        print('data = \n{}'.format(self.data[:10]))
 
 
         # Save for extracting poses directly
@@ -601,6 +604,7 @@ class Apolloscape(Dataset):
         fmt_str += "    Record: {}\n".format(self.record)
         fmt_str += "    Train: {}\n".format(self.train)
         fmt_str += "    Normalize Poses: {}\n".format(self.normalize_poses)
+        fmt_str += "    Stereo: {}\n".format(self.stereo)
         fmt_str += "    Length: {} of {}\n".format(self.__len__(), len(self.data))
         fmt_str += "    Cameras: {}\n".format(self.cameras_list)
         fmt_str += "    Records: {}\n".format(self.records_list)
