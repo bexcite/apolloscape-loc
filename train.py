@@ -295,6 +295,7 @@ def make_figure(model, dataloader, poses_mean=None, poses_std=None,
             os.makedirs(fig_dir)
         fig_path = os.path.join(fig_dir, '{}_e{}.png'.format(experiment_name, epoch))
         plt.savefig(fig_path)
+        plt.close()
 #         print("Fig saved to '{}'".format(fig_path))
 
 
