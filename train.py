@@ -74,7 +74,7 @@ def get_args():
                         help="Experiment name")
     parser.add_argument("--feature-net", metavar="FEATURE_NETWORK_NAME", default="resnet18",
                 type=str, choices=('resnet18', 'resnet34', 'resnet50'),
-                help="Device to work on")
+                help="Feature extractor network. Choice from ('resnet18', 'resnet34', 'resnet50')")
     parser.add_argument("--feature-net-pretrained", dest="pretrained",
                 action="store_true", default=False,
                 help="Don't save cache of transformed images (saves lots of \
@@ -287,7 +287,7 @@ def make_figure(model, dataloader, poses_mean=None, poses_std=None,
     q_loss = np.asarray([quaternion_angular_error(p, t) for p, t in zip(pred_poses[:, 3:], gt_poses[:, 3:])])
 
     draw_pred_gt_poses(pred_poses, gt_poses)
-    plt.title('Prediction on Train Dataset, epoch = {}'.format(epoch))
+    plt.title('Prediction on Train: ep={}, Te={:.3f}, Re={:.3f}'.format(epoch, np.mean(t_loss), np.mean(q_loss)))
 
     if experiment_name:
         fig_dir = os.path.join('_checkpoints', experiment_name)
@@ -295,7 +295,7 @@ def make_figure(model, dataloader, poses_mean=None, poses_std=None,
             os.makedirs(fig_dir)
         fig_path = os.path.join(fig_dir, '{}_e{}.png'.format(experiment_name, epoch))
         plt.savefig(fig_path)
-        print("Fig saved to '{}'".format(fig_path))
+#         print("Fig saved to '{}'".format(fig_path))
 
 
 

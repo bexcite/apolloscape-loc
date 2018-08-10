@@ -214,7 +214,7 @@ def draw_pred_gt_poses(pred_poses, gt_poses):
     p_min, _, _, _ = set_3d_axes_limits(ax, all_poses, pose_format='quat')
 
     draw_poses(ax, pred_poses[:, :3], proj=False, proj_z=int(p_min[2] - 1), c='r', s=60)
-    draw_poses(ax, gt_poses[:, :3], proj=True, proj_z=int(p_min[2] - 1), c='b', s=60)
+    draw_poses(ax, gt_poses[:, :3], proj=False, proj_z=int(p_min[2] - 1), c='b', s=60)
     for i in range(pred_poses.shape[0]):
         pp = pred_poses[i, :3]
         gp = gt_poses[i, :3]
