@@ -7,6 +7,7 @@ from tqdm import tqdm
 from PIL import ImageFile
 import os
 from datetime import datetime
+import warnings
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True # it's important because not all images read without this
 
@@ -24,9 +25,9 @@ def img_tensor_to_numpy(img, img_normalized=True):
     return img
 
 # Show images
-def imshow(img, title=None):
+def imshow(img, title=None, img_normalized=True):
 #     img = img.numpy().transpose([1, 2, 0])
-    img = img_tensor_to_numpy(img)
+    img = img_tensor_to_numpy(img, img_normalized=img_normalized)
     fig = plt.figure(figsize=(18, 18))
     if title is not None:
         plt.title(title)
@@ -81,10 +82,21 @@ def make_video(dataset, record=None, outfile=None):
 
 # TODO: Stereo=False mode support
 def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, img_normalized=True):
+    if not dataset.stereo:
+        warnings.warn('This method supports only stereo mode. Other: NOT IMPLEMENTED')
+        return
+    
     # Save current dataset's record and restore it later
     if record is not None and restore_record:
         saved_rec = dataset.record
         dataset.record = record
+        
+    if len(dataset) == 0:
+        if restore_record:
+            dataset.record = saved_rec
+        print('Empty dataset for record {}'.format(dataset.record))
+        return
+        
 
     fig = None
     if axes is None:
@@ -114,8 +126,12 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, 
 
 
     # Sample a data point from the record
+#     print('len(dataset) = {}'.format(len(dataset)))
     if idx is None:
         idx = np.random.randint(len(dataset))
+#     print('len(record_idxs) = {}'.format(len(dataset.record_idxs)))
+#     print('len(dataset) = {}'.format(len(dataset)))
+#     print('idx = {}'.format(idx))
     images, poses = dataset[idx]
 
 
@@ -135,16 +151,17 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, 
     ax3.set_zlim(int(p_min[2] - 1), int(p_max[2] + 1))
 
     # Show all poses for selected record
-    poses1, poses2 = dataset.poses_translations()
-    mid_poses = 0.5 * (poses1 + poses2)
+    all_poses = dataset.poses_translations()
+#     mid_poses = 0.5 * (poses1 + poses2)
 
     # print('mid_poses = {}'.format(mid_poses))
 
-    draw_poses(ax3, mid_poses, proj=True, proj_z=int(p_min[2] - 1))
+    draw_poses(ax3, all_poses, proj=True, proj_z=int(p_min[2] - 1)) # mid_poses
 
     # Show current sample pose
     mid_pose = 0.5 * (extract_translation(poses[0], pose_format=dataset.pose_format)
                 + extract_translation(poses[1], pose_format=dataset.pose_format))
+    
     draw_poses(ax3, [mid_pose], c='r', s=60, proj=True, proj_z=int(p_min[2] - 1 ))
 
 #     ax1.imshow(images[0])
