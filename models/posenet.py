@@ -28,11 +28,16 @@ class PoseNet(torch.nn.Module):
 
 #         x = self.feature_extractor(x)
 
-        x_features = [self.feature_extractor(xi) for xi in x]
-        x_translations = [self.fc_xyz(xi) for xi in x_features]
-        x_rotations = [self.fc_quat(xi) for xi in x_features]
-
-        x_poses = [torch.cat((xt, xr), dim=1) for xt, xr in zip(x_translations, x_rotations)]
+        if type(x) is list:
+            x_features = [self.feature_extractor(xi) for xi in x]
+            x_translations = [self.fc_xyz(xi) for xi in x_features]
+            x_rotations = [self.fc_quat(xi) for xi in x_features]
+            x_poses = [torch.cat((xt, xr), dim=1) for xt, xr in zip(x_translations, x_rotations)]  
+        elif torch.is_tensor(x):
+            x_features = self.feature_extractor(x)
+            x_translations = self.fc_xyz(x_features) 
+            x_rotations = self.fc_quat(x_features)
+            x_poses = torch.cat((x_translations, x_rotations), dim=1)
 
         return x_poses
 
@@ -57,17 +62,16 @@ class PoseNetCriterion(torch.nn.Module):
                 # Translation loss
                 loss += self.loss_fn(x[i][:, :3], y[i][:, :3])
                 # Rotation loss
-#                 p_norm = torch.norm(x[i][:, 3:])
-                p_norm = 1.0
-                loss += self.beta * self.loss_fn(x[i][:, 3:]/p_norm, y[i][:, 3:])
+                loss += self.beta * self.loss_fn(x[i][:, 3:], y[i][:, 3:])
+        
+            # Normalize per image so we can compare stereo vs no-stereo mode
+            loss = loss / 2
         else:
             # Translation loss
             loss += self.loss_fn(x[:, :3], y[:, :3])
 
             # Rotation loss
-            # p_norm = torch.norm(x[:, 3:])
-            p_norm = 1.0
-            loss += self.beta * self.loss_fn(x[:, 3:]/p_norm, y[:, 3:])
+            loss += self.beta * self.loss_fn(x[:, 3:], y[:, 3:])
 #         print('x = \n{}'.format(x[0]))
 #         print('y = \n{}'.format(y[0]))
         return loss

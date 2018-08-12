@@ -44,6 +44,14 @@ python plot_dataset.py --data ./data/apolloscape --road road03_seg --record Reco
 python plot_dataset.py --data ./data/apolloscape --road road03_seg --record Record018 --video
 ```
 
+# Train PoseNet on ZPark road
+
+```
+python train.py --data ./data/apolloscape --road zpark-sample --checkpoint-save 10 --fig-save 1 --epochs 50 --lr 1e-5 --experiment zpark_posenet_L1 --feature-net resnet34 --feature-net-pretrained
+```
+
+
+
 ![Record video](./assets/road03_seg_Record018.gif)
 
 # TODO:

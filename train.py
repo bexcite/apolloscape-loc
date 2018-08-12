@@ -39,9 +39,9 @@ def get_args():
     parser.add_argument("--data", metavar="DIR", required=True,
                         help="Path to Apolloscape dataset")
     parser.add_argument("--road", metavar="ROAD_DIR", default="zpark-sample",
-                        help="Path to the road within ApolloScape")
+                        help="Path to the road within ApolloScape. Default: zpark-sample")
     parser.add_argument("--output-dir", metavar="OUTPUT_DIR", default="output_data",
-                        help="Path to save logs, models, figures and videos")
+                        help="Path to save logs, models, figures and videos. Default: output_data")
     parser.add_argument("--video", metavar="VIDEO_OUT_FILE", type=str, action="store", default=None, const="", nargs="?",
                         help="Generate and save video of a training")
     parser.add_argument("--no-display", dest="no_display", action="store_true", default=False,
@@ -49,38 +49,42 @@ def get_args():
     parser.add_argument("--no-cache-transform", dest="no_cache_transform", action="store_true", default=False,
                         help="Don't save cache of transformed images (saves lots of disk space but dramatically decreases the speed of training)")
     parser.add_argument("--device", metavar="DEVICE", default="cuda", type=str, choices=('cuda', 'cpu'),
-                        help="Device to work on")
+                        help="Device to work on. Default: cuda")
     parser.add_argument("--checkpoint", metavar="CHECKPOINT_FILE", type=str,
                         help="Checkpoint file to restore model and optimizer parameters from")
     parser.add_argument("--checkpoint-save", metavar="EPOCH_NUM", type=int, default=100,
-                        help="Save checkpoint every EPOCH_NUM epochs. (default: 100)")
+                        help="Save checkpoint every EPOCH_NUM epochs. Default: 100")
     parser.add_argument("--fig-save", metavar="EPOCH_NUM", type=int, default=0,
                         help="Save pred/gt figure on training dataset every EPOCH_NUM epochs. \
-                            (default: 0 = don't save)")
+                            Default: 0 = don't save")
     parser.add_argument("--epochs", metavar="NUM_EPOCHS", type=int, default=1,
-                        help="Number of epochs to train the model. (default: 1)")
+                        help="Number of epochs to train the model. Default: 1")
     parser.add_argument("--val-freq", metavar="VAL_FREQ", type=int, default=5,
-                        help="Validation frequency every VAL_FREQ epochs. (default: 5)")
+                        help="Validation frequency every VAL_FREQ epochs. Default: 5")
     parser.add_argument("--log-freq", metavar="LOG_FREQ", type=int, default=0,
                         help="Log frequency during training and validation every LOG_FREQ batch. \
                         (default: 0 - once per epoch)")
     parser.add_argument("--batch-size", metavar="BATCH_SIZE", type=int, default=40,
                         help="Batch size. \
-                        (default: 40 - fits in most cases on GPU)")
+                        Default: 40 - fits in most cases on GPU")
     parser.add_argument("--lr", metavar="LR", type=float, default=1e-4,
                         help="Learning rate. \
-                        (default: 1e-4)")
+                        Default: 1e-4")
     parser.add_argument("--experiment", metavar="EXP_NAME", type=str, default='run',
-                        help="Experiment name")
+                        help="Experiment name. Defaul: run")
     parser.add_argument("--feature-net", metavar="FEATURE_NETWORK_NAME", default="resnet18",
                 type=str, choices=('resnet18', 'resnet34', 'resnet50'),
-                help="Feature extractor network. Choice from ('resnet18', 'resnet34', 'resnet50')")
+                help="Feature extractor network. Choice from ('resnet18', 'resnet34', 'resnet50'). Default: resnet18")
     parser.add_argument("--feature-net-pretrained", dest="pretrained",
                 action="store_true", default=False,
                 help="Don't save cache of transformed images (saves lots of \
                 disk space but dramatically decreases the speed of training)")
     parser.add_argument("--feature-net-features", metavar="NUM_FEATURES", type=int, default=2048,
-                help="Number of features before the last regressor layer.")
+                help="Number of features before the last regressor layer. Default: 2048")
+    parser.add_argument("--stereo", dest="stereo", action="store_true", default=False,
+                    help="Use stereo pairs for training (no geometric constraints applied). Default: False")
+
+
 
 
 
@@ -114,12 +118,14 @@ def main():
     train_record = None # 'Record001'
     train_dataset = Apolloscape(root=args.data, road=args.road,
         transform=transform, record=train_record, normalize_poses=True,
-        pose_format='quat', train=True, cache_transform=not args.no_cache_transform)
+        pose_format='quat', train=True, cache_transform=not args.no_cache_transform,
+        stereo=args.stereo)
 
     val_record = None # 'Record011'
     val_dataset = Apolloscape(root=args.data, road=args.road,
         transform=transform, record=val_record, normalize_poses=True,
-        pose_format='quat', train=False, cache_transform=not args.no_cache_transform)
+        pose_format='quat', train=False, cache_transform=not args.no_cache_transform,
+        stereo=args.stereo)
 
 
     # Show datasets
@@ -165,7 +171,7 @@ def main():
     model = model.to(device)
 
     # Criterion
-    criterion = PoseNetCriterion(stereo=True, beta=200.0)
+    criterion = PoseNetCriterion(stereo=args.stereo, beta=200.0)
 
     # Create optimizer
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.0005)
@@ -193,20 +199,21 @@ def main():
         # Train for one epoch
         train(train_dataloader, model, criterion, optimizer, e, n_epochs,
               log_freq=args.log_freq, poses_mean=train_dataset.poses_mean,
-              poses_std=train_dataset.poses_std, device=device)
+              poses_std=train_dataset.poses_std, device=device,
+              stereo=args.stereo)
 
         # Run validation loop
         if e > 0 and e % val_freq == 0:
             end = time.time()
             validate(val_dataloader, model, criterion, e, log_freq=args.log_freq,
-                    device=device)
+                    device=device, stereo=args.stereo)
 
         # Make figure
         if e > 0 and args.fig_save > 0 and e % args.fig_save == 0:
             exp_name = '{}_{}'.format(time_str, experiment_name)
             make_figure(model, train_dataloader, poses_mean=poses_mean,
                     poses_std=poses_std, epoch=e,
-                    experiment_name=exp_name, device=device)
+                    experiment_name=exp_name, device=device, stereo=args.stereo)
 
         # Make checkpoint
         if e > 0 and e % args.checkpoint_save == 0:
@@ -220,7 +227,7 @@ def main():
 
     print('\n=== Test Training Dataset ======')
     pred_poses, gt_poses = model_results_pred_gt(model, train_dataloader, poses_mean, poses_std,
-                                                 device=device)
+                                                 device=device, stereo=args.stereo)
 
     print('gt_poses = {}'.format(gt_poses.shape))
     print('pred_poses = {}'.format(pred_poses.shape))
@@ -238,7 +245,7 @@ def main():
 
     print('\n=== Test Validation Dataset ======')
     pred_poses, gt_poses = model_results_pred_gt(model, val_dataloader, poses_mean, poses_std,
-                                                 device=device)
+                                                 device=device, stereo=args.stereo)
 
     print('gt_poses = {}'.format(gt_poses.shape))
     print('pred_poses = {}'.format(pred_poses.shape))
@@ -279,10 +286,10 @@ def make_checkpoint(model, optimizer, epoch=None, time_str=None, args=None):
 
 
 def make_figure(model, dataloader, poses_mean=None, poses_std=None,
-        epoch=None, experiment_name=None, device='cpu'):
+        epoch=None, experiment_name=None, device='cpu', stereo=True):
 
     pred_poses, gt_poses = model_results_pred_gt(model, dataloader,
-            poses_mean, poses_std, device=device)
+            poses_mean, poses_std, device=device, stereo=stereo)
     t_loss = np.asarray([np.linalg.norm(p - t) for p, t in zip(pred_poses[:, :3], gt_poses[:, :3])])
     q_loss = np.asarray([quaternion_angular_error(p, t) for p, t in zip(pred_poses[:, 3:], gt_poses[:, 3:])])
 

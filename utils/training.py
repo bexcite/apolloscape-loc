@@ -9,7 +9,7 @@ from utils.common import quaternion_angular_error
 
 # train function
 def train(train_loader, model, criterion, optimizer, epoch, max_epoch, log_freq=1, print_sum=True,
-          poses_mean=None, poses_std=None, device=None):
+          poses_mean=None, poses_std=None, device=None, stereo=True):
 
     # switch model to training
     model.train()
@@ -27,15 +27,21 @@ def train(train_loader, model, criterion, optimizer, epoch, max_epoch, log_freq=
         data_time = (time.time() - end)
 
         # TODO: Stereo=False mode (make it Tensor???? instead of list)
-        batch_images = [x.to(device) for x in batch_images]
-        batch_poses = [x.to(device) for x in batch_poses]
+        if stereo:
+            batch_images = [x.to(device) for x in batch_images]
+            batch_poses = [x.to(device) for x in batch_poses]
+        else:
+            batch_images = batch_images.to(device)
+            batch_poses = batch_poses.to(device)
+            
 
         out = model(batch_images)
         loss = criterion(out, batch_poses)
 #         print('loss = {}'.format(loss))
 
         # TODO: Stereo=False mode
-        losses.update(loss, len(batch_images) * batch_images[0].size(0))
+        losses.update(loss, len(batch_images) * batch_images[0].size(0) if stereo
+                else batch_images.size(0))
 
 
         optimizer.zero_grad()
@@ -45,10 +51,16 @@ def train(train_loader, model, criterion, optimizer, epoch, max_epoch, log_freq=
 
         # TODO: Stereo=False
         # move data to cpu & numpy
-        bp = [x.detach().cpu().numpy() for x in batch_poses]
-        outp = [x.detach().cpu().numpy() for x in out]
-        gt_poses = np.vstack((gt_poses, *bp))
-        pred_poses = np.vstack((pred_poses, *outp))
+        if stereo:
+            bp = [x.detach().cpu().numpy() for x in batch_poses]
+            outp = [x.detach().cpu().numpy() for x in out]
+            gt_poses = np.vstack((gt_poses, *bp))
+            pred_poses = np.vstack((pred_poses, *outp))
+        else:
+            bp = batch_poses.detach().cpu().numpy()
+            outp = out.detach().cpu().numpy()
+            gt_poses = np.vstack((gt_poses, bp))
+            pred_poses = np.vstack((pred_poses, outp))
 
 
         batch_time = (time.time() - end)
@@ -90,7 +102,7 @@ def train(train_loader, model, criterion, optimizer, epoch, max_epoch, log_freq=
 #     return losses.avg
 
 
-def validate(val_loader, model, criterion, epoch, log_freq=1, print_sum=True, device=None):
+def validate(val_loader, model, criterion, epoch, log_freq=1, print_sum=True, device=None, stereo=True):
 
     losses = AverageMeter()
 
@@ -104,15 +116,21 @@ def validate(val_loader, model, criterion, epoch, log_freq=1, print_sum=True, de
             data_time = time.time() - end
 
             # TODO: Stereo=False mode support
-            batch_images = [x.to(device) for x in batch_images]
-            batch_poses = [x.to(device) for x in batch_poses]
+            if stereo:
+                batch_images = [x.to(device) for x in batch_images]
+                batch_poses = [x.to(device) for x in batch_poses]
+            else:
+                batch_images = batch_images.to(device)
+                batch_poses = batch_poses.to(device)
+
 
             # compute model output
             out = model(batch_images)
             loss = criterion(out, batch_poses)
 
             # TODO: Stereo=False mode support
-            losses.update(loss, len(batch_images) * batch_images[0].size(0))
+            losses.update(loss, len(batch_images) * batch_images[0].size(0) if stereo
+                else batch_images.size(0))
 
             batch_time = time.time() - end
             end = time.time()
@@ -136,7 +154,7 @@ def validate(val_loader, model, criterion, epoch, log_freq=1, print_sum=True, de
 #     return losses.avg
 
 
-def model_results_pred_gt(model, dataloader, poses_mean=None, poses_std=None, device=None):
+def model_results_pred_gt(model, dataloader, poses_mean=None, poses_std=None, device=None, stereo=True):
     model.eval()
 
     gt_poses = np.empty((0, 7))
@@ -145,8 +163,13 @@ def model_results_pred_gt(model, dataloader, poses_mean=None, poses_std=None, de
     for idx, (batch_images, batch_poses) in enumerate(dataloader):
 
         # TODO: Stereo=False mode support
-        batch_images = [x.to(device) for x in batch_images]
-        batch_poses = [x.to(device) for x in batch_poses]
+        if stereo:
+            batch_images = [x.to(device) for x in batch_images]
+            batch_poses = [x.to(device) for x in batch_poses]
+        else:
+            batch_images = batch_images.to(device)
+            batch_poses = batch_poses.to(device)
+
 
         out = model(batch_images)
 
@@ -155,11 +178,16 @@ def model_results_pred_gt(model, dataloader, poses_mean=None, poses_std=None, de
 
         # TODO: Stereo=False mode support
         # move data to cpu & numpy
-        batch_poses = [x.detach().cpu().numpy() for x in batch_poses]
-        out = [x.detach().cpu().numpy() for x in out]
-
-        gt_poses = np.vstack((gt_poses, *batch_poses))
-        pred_poses = np.vstack((pred_poses, *out))
+        if stereo:
+            batch_poses = [x.detach().cpu().numpy() for x in batch_poses]
+            out = [x.detach().cpu().numpy() for x in out]
+            gt_poses = np.vstack((gt_poses, *batch_poses))
+            pred_poses = np.vstack((pred_poses, *out))
+        else:
+            bp = batch_poses.detach().cpu().numpy()
+            outp = out.detach().cpu().numpy()
+            gt_poses = np.vstack((gt_poses, bp))
+            pred_poses = np.vstack((pred_poses, outp))
 
         # if idx == 0:
         #     break

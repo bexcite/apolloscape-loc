@@ -341,6 +341,8 @@ class Apolloscape(Dataset):
                 normalize_poses=self.normalize_poses)
         self.poses_mean = poses_mean
         self.poses_std = poses_std
+        print('poses_mean = {}'.format(self.poses_mean))
+        print('poses_std = {}'.format(self.poses_std))
 
         # Reassign poses after processing
         # TODO: data 3 or 5
