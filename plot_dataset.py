@@ -47,11 +47,9 @@ def main():
 
     if args.show_records_count:
         print("=== Records count: ")
-        data_array = apollo_dataset.all_data_array
-        recs_num = {}
-        for r in apollo_dataset.records_list:
-            n = np.sum(data_array[:, 4] == r)
-            recs_num[r] = n
+        
+        recs_num = apollo_dataset.get_records_counts()
+            
         recs_num = sorted(recs_num.items(), key=lambda kv: kv[1], reverse=True)
         print("\n".join(["\t{} - {}".format(r[0], r[1]) for r in recs_num ]))
         return
