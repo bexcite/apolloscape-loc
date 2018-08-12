@@ -26,7 +26,6 @@ def train(train_loader, model, criterion, optimizer, epoch, max_epoch, log_freq=
     for idx, (batch_images, batch_poses) in enumerate(train_loader):
         data_time = (time.time() - end)
 
-        # TODO: Stereo=False mode (make it Tensor???? instead of list)
         if stereo:
             batch_images = [x.to(device) for x in batch_images]
             batch_poses = [x.to(device) for x in batch_poses]
@@ -39,17 +38,16 @@ def train(train_loader, model, criterion, optimizer, epoch, max_epoch, log_freq=
         loss = criterion(out, batch_poses)
 #         print('loss = {}'.format(loss))
 
-        # TODO: Stereo=False mode
         losses.update(loss, len(batch_images) * batch_images[0].size(0) if stereo
                 else batch_images.size(0))
 
 
+        # Make an optimization step
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        
 
-
-        # TODO: Stereo=False
         # move data to cpu & numpy
         if stereo:
             bp = [x.detach().cpu().numpy() for x in batch_poses]
@@ -115,7 +113,6 @@ def validate(val_loader, model, criterion, epoch, log_freq=1, print_sum=True, de
         for idx, (batch_images, batch_poses) in enumerate(val_loader):
             data_time = time.time() - end
 
-            # TODO: Stereo=False mode support
             if stereo:
                 batch_images = [x.to(device) for x in batch_images]
                 batch_poses = [x.to(device) for x in batch_poses]
@@ -128,7 +125,6 @@ def validate(val_loader, model, criterion, epoch, log_freq=1, print_sum=True, de
             out = model(batch_images)
             loss = criterion(out, batch_poses)
 
-            # TODO: Stereo=False mode support
             losses.update(loss, len(batch_images) * batch_images[0].size(0) if stereo
                 else batch_images.size(0))
 
@@ -176,7 +172,6 @@ def model_results_pred_gt(model, dataloader, poses_mean=None, poses_std=None, de
         # loss = criterion(out, batch_poses)
 #         print('loss = {}'.format(loss))
 
-        # TODO: Stereo=False mode support
         # move data to cpu & numpy
         if stereo:
             batch_poses = [x.detach().cpu().numpy() for x in batch_poses]

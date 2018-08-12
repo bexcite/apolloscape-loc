@@ -35,7 +35,6 @@ def imshow(img, title=None, img_normalized=True):
     plt.pause(0.001)
 
 
-# TODO: [TEST] Stereo=False mode support
 def make_video(dataset, record=None, outfile=None):
     if record is not None:
         dataset.record = record
@@ -72,6 +71,8 @@ def make_video(dataset, record=None, outfile=None):
     with writer.saving(fig, outfile, 100):
         
         step = 1
+        
+        # Iterate over one camera only
         if not dataset.stereo:
             step = 2
 
@@ -91,7 +92,6 @@ def make_video(dataset, record=None, outfile=None):
     print("Video saved successfully!")
 
 
-# TODO: [TEST] Stereo=False mode support
 def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, img_normalized=True):
     
     # Save current dataset's record and restore it later
@@ -100,9 +100,9 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, 
         dataset.record = record
         
     if len(dataset) == 0:
+#         print('Empty dataset for record {}'.format(dataset.record))
         if restore_record:
             dataset.record = saved_rec
-        print('Empty dataset for record {}'.format(dataset.record))
         return
         
 
@@ -143,12 +143,8 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, 
 
 
     # Sample a data point from the record
-#     print('len(dataset) = {}'.format(len(dataset)))
     if idx is None:
         idx = np.random.randint(len(dataset))
-#     print('len(record_idxs) = {}'.format(len(dataset.record_idxs)))
-#     print('len(dataset) = {}'.format(len(dataset)))
-#     print('idx = {}'.format(idx))
     images, poses = dataset[idx]
 
 
@@ -169,11 +165,8 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, 
 
     # Show all poses for selected record
     all_poses = dataset.poses_translations()
-#     mid_poses = 0.5 * (poses1 + poses2)
 
-    # print('mid_poses = {}'.format(mid_poses))
-
-    draw_poses(ax3, all_poses, proj=True, proj_z=int(p_min[2] - 1)) # mid_poses
+    draw_poses(ax3, all_poses, proj=True, proj_z=int(p_min[2] - 1))
 
     # Show current sample pose
     if dataset.stereo:
@@ -308,7 +301,6 @@ def save_checkpoint(model, optimizer, experiment_name='test', epoch=None,
         os.makedirs(checkpoints_dir)
 
     fname_path = os.path.join(checkpoints_dir, fname)
-#     print('fname_path = {}'.format(fname_path))
 
     checkpoint_dict = {
         'epoch': epoch,
