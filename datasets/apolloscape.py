@@ -698,7 +698,8 @@ class Apolloscape(Dataset):
         fmt_str += "    Train: {}\n".format(self.train)
         fmt_str += "    Normalize Poses: {}\n".format(self.normalize_poses)
         fmt_str += "    Stereo: {}\n".format(self.stereo)
-        fmt_str += "    Length: {} of {}\n".format(self.__len__(), len(self.d_images))
+        fmt_str += "    Length: {} of {}\n".format(self.__len__(),
+                            len(self.d_images) // 2 if self.stereo else len(self.d_images))
         fmt_str += "    Cameras: {}\n".format(self.cameras_list)
         fmt_str += "    Records: {}\n".format(self.records_list)
         return fmt_str

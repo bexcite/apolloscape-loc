@@ -35,7 +35,7 @@ def imshow(img, title=None, img_normalized=True):
     plt.pause(0.001)
 
 
-# TODO: Stereo=False mode support
+# TODO: [TEST] Stereo=False mode support
 def make_video(dataset, record=None, outfile=None):
     if record is not None:
         dataset.record = record
@@ -57,8 +57,12 @@ def make_video(dataset, record=None, outfile=None):
 
     fig = plt.figure(figsize=(8, 8))
 
-    ax1 = plt.subplot(2, 2, 1)
-    ax2 = plt.subplot(2, 2, 2)
+    if dataset.stereo:
+        ax1 = plt.subplot(2, 2, 1)
+        ax2 = plt.subplot(2, 2, 2)
+    else:
+        ax1 = plt.subplot(2, 1, 1)
+    
     ax3 = plt.subplot(2, 1, 2, projection='3d')
     plt.subplots_adjust(wspace=0.01, hspace=0.05)
 
@@ -66,10 +70,17 @@ def make_video(dataset, record=None, outfile=None):
 
     # Video Loop
     with writer.saving(fig, outfile, 100):
+        
+        step = 1
+        if not dataset.stereo:
+            step = 2
 
-        for idx in tqdm(range(len(dataset))):
+        for idx in tqdm(range(0, len(dataset), step)):
 
-            draw_record(dataset, idx=idx, axes=[ax1, ax2, ax3])
+            if dataset.stereo:
+                draw_record(dataset, idx=idx, axes=[ax1, ax2, ax3])
+            else:
+                draw_record(dataset, idx=idx, axes=[ax1, ax3])
 
             # Store video frame
             writer.grab_frame()
@@ -80,11 +91,8 @@ def make_video(dataset, record=None, outfile=None):
     print("Video saved successfully!")
 
 
-# TODO: Stereo=False mode support
+# TODO: [TEST] Stereo=False mode support
 def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, img_normalized=True):
-    if not dataset.stereo:
-        warnings.warn('This method supports only stereo mode. Other: NOT IMPLEMENTED')
-        return
     
     # Save current dataset's record and restore it later
     if record is not None and restore_record:
@@ -101,24 +109,33 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, 
     fig = None
     if axes is None:
         fig = plt.figure(figsize=(8, 8))
-        ax1 = plt.subplot(2, 2, 1)
-        ax2 = plt.subplot(2, 2, 2)
+        if dataset.stereo:
+            ax1 = plt.subplot(2, 2, 1)
+            ax2 = plt.subplot(2, 2, 2)
+        else:
+            ax1 = plt.subplot(2, 1, 1)
         ax3 = plt.subplot(2, 1, 2, projection='3d')
         plt.subplots_adjust(wspace=0.01, hspace=0.0)
     else:
-        ax1 = axes[0]
-        ax2 = axes[1]
-        ax3 = axes[2]
+        if dataset.stereo:
+            ax1 = axes[0]
+            ax2 = axes[1]
+            ax3 = axes[2]
+        else:
+            ax1 = axes[0]
+            ax3 = axes[1]
 
         # Clean previous data
         ax1.cla()
-        ax2.cla()
+        if dataset.stereo:
+            ax2.cla()
         ax3.cla()
 
 
     # Set up axes
     ax1.axis('off')
-    ax2.axis('off')
+    if dataset.stereo:
+        ax2.axis('off')
     ax3.set_xlabel('$X$')
     ax3.set_ylabel('$Y$')
     ax3.set_zlabel('$Z$')
@@ -159,15 +176,21 @@ def draw_record(dataset, record=None, idx=None, restore_record=True, axes=None, 
     draw_poses(ax3, all_poses, proj=True, proj_z=int(p_min[2] - 1)) # mid_poses
 
     # Show current sample pose
-    mid_pose = 0.5 * (extract_translation(poses[0], pose_format=dataset.pose_format)
-                + extract_translation(poses[1], pose_format=dataset.pose_format))
+    if dataset.stereo:
+        mid_pose = 0.5 * (extract_translation(poses[0], pose_format=dataset.pose_format)
+                    + extract_translation(poses[1], pose_format=dataset.pose_format))
+    else:
+        mid_pose = extract_translation(poses, pose_format=dataset.pose_format)
     
     draw_poses(ax3, [mid_pose], c='r', s=60, proj=True, proj_z=int(p_min[2] - 1 ))
 
 #     ax1.imshow(images[0])
 #     ax2.imshow(images[1])
-    ax1.imshow(img_tensor_to_numpy(images[0], img_normalized=img_normalized))
-    ax2.imshow(img_tensor_to_numpy(images[1], img_normalized=img_normalized))
+    if dataset.stereo:
+        ax1.imshow(img_tensor_to_numpy(images[0], img_normalized=img_normalized))
+        ax2.imshow(img_tensor_to_numpy(images[1], img_normalized=img_normalized))
+    else:
+        ax1.imshow(img_tensor_to_numpy(images, img_normalized=img_normalized))
 
 
     # Restore record if it was custom
