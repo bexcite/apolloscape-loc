@@ -56,7 +56,7 @@ python train.py --data ./data/apolloscape --road zpark-sample --checkpoint-save 
 
 
 # TODO:
-* implement `stereo=False` mode and train on not filtered data
+* add weights initialization to PoseNet model
 * PoseNet with automatic weights learning
 * VidLoc implementation
 * [Optional] Prepare data for [eval script](https://github.com/ApolloScapeAuto/dataset-api/tree/master/self_localization)
