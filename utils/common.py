@@ -287,7 +287,7 @@ def calc_poses_params(poses, pose_format='full-mat'):
 
 
 # Save checkpoint
-def save_checkpoint(model, optimizer, experiment_name='test', epoch=None,
+def save_checkpoint(model, optimizer, criterion, experiment_name='test', epoch=None,
                     time_str=None):
     if not time_str:
         time_str = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -307,6 +307,9 @@ def save_checkpoint(model, optimizer, experiment_name='test', epoch=None,
         'model_state_dict': model.state_dict(),
         'optim_state_dict': optimizer.state_dict()
     }
+    
+    if criterion.learn_beta:
+        checkpoint_dict.update({'criterion_state_dict': criterion.state_dict()})
 
     torch.save(checkpoint_dict, fname_path)
 

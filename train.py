@@ -70,6 +70,12 @@ def get_args():
     parser.add_argument("--lr", metavar="LR", type=float, default=1e-4,
                         help="Learning rate. \
                         Default: 1e-4")
+    parser.add_argument("--beta", metavar="BETA", type=float, default=512.0,
+                        help="Beta for geometric loss functions L = L(t) + beta * L(r) \
+                        Default: 512.0")
+    parser.add_argument("--learn-beta", dest="learn_beta", action="store_true", default=False,
+                help="Automatically learn error weights for L(t) and L(r) instead of fixed beta. \
+                Default: False")
     parser.add_argument("--experiment", metavar="EXP_NAME", type=str, default='run',
                         help="Experiment name. Defaul: run")
     parser.add_argument("--feature-net", metavar="FEATURE_NETWORK_NAME", default="resnet18",
@@ -171,10 +177,17 @@ def main():
     model = model.to(device)
 
     # Criterion
-    criterion = PoseNetCriterion(stereo=args.stereo, beta=200.0)
+    criterion = PoseNetCriterion(stereo=args.stereo, beta=args.beta, learn_beta=args.learn_beta)
+    criterion.to(device)
+    
+    # Add all params for optimization
+    param_list = [{'params': model.parameters()}]
+    if criterion.learn_beta:
+        param_list.append({'params': criterion.parameters()})
+
 
     # Create optimizer
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.0005)
+    optimizer = optim.Adam(params=param_list, lr=args.lr, weight_decay=0.0005)
 
     start_epoch = 0
 
@@ -188,6 +201,9 @@ def main():
             model.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optim_state_dict'])
             start_epoch = checkpoint['epoch']
+            if 'criterion_state_dict' in checkpoint:
+                criterion.load_state_dict(checkpoint['criterion_state_dict'])
+                print('Loaded criterion params too.')
 
 
     n_epochs = start_epoch + args.epochs
@@ -217,7 +233,7 @@ def main():
 
         # Make checkpoint
         if e > 0 and e % args.checkpoint_save == 0:
-            make_checkpoint(model, optimizer, epoch=e, time_str=time_str,
+            make_checkpoint(model, optimizer, criterion, epoch=e, time_str=time_str,
                         args=args)
 
 
@@ -262,7 +278,7 @@ def main():
 
     # Save checkpoint
     print('\nSaving model params ....')
-    make_checkpoint(model, optimizer, epoch=n_epochs, time_str=time_str,
+    make_checkpoint(model, optimizer, criterion, epoch=n_epochs, time_str=time_str,
                     args=args)
 
 
@@ -277,9 +293,9 @@ def get_experiment_name(args):
     return fname
 
 
-def make_checkpoint(model, optimizer, epoch=None, time_str=None, args=None):
+def make_checkpoint(model, optimizer, criterion, epoch=None, time_str=None, args=None):
     fname = get_experiment_name(args)
-    saved_path = save_checkpoint(model, optimizer, experiment_name=fname,
+    saved_path = save_checkpoint(model, optimizer, criterion, experiment_name=fname,
                     epoch=epoch, time_str=time_str)
 
     print('Model saved to {}'.format(saved_path))

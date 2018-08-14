@@ -38,14 +38,14 @@ def train(train_loader, model, criterion, optimizer, epoch, max_epoch, log_freq=
         loss = criterion(out, batch_poses)
 #         print('loss = {}'.format(loss))
 
-        losses.update(loss, len(batch_images) * batch_images[0].size(0) if stereo
-                else batch_images.size(0))
-
 
         # Make an optimization step
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        
+        losses.update(loss.data[0], len(batch_images) * batch_images[0].size(0) if stereo
+                else batch_images.size(0))
         
 
         # move data to cpu & numpy
@@ -93,9 +93,11 @@ def train(train_loader, model, criterion, optimizer, epoch, max_epoch, log_freq=
 
 
     if print_sum:
-        print('Ep: [{}/{}]\tTrain Loss: {:.3f}\tTe: {:.3f}\tRe: {:.3f}\t Et: {:.2f}s'.format(
+        print('Ep: [{}/{}]\tTrain Loss: {:.3f}\tTe: {:.3f}\tRe: {:.3f}\t Et: {:.2f}s\t\
+              {criterion_sx:.5f}:{criterion_sq:.5f}'.format(
             epoch, max_epoch - 1, losses.avg, np.mean(t_loss), np.mean(q_loss),
-            (time.time() - epoch_time)))
+            (time.time() - epoch_time), criterion_sx=criterion.sx.data[0],
+            criterion_sq=criterion.sq.data[0]))
 
 #     return losses.avg
 
@@ -125,7 +127,7 @@ def validate(val_loader, model, criterion, epoch, log_freq=1, print_sum=True, de
             out = model(batch_images)
             loss = criterion(out, batch_poses)
 
-            losses.update(loss, len(batch_images) * batch_images[0].size(0) if stereo
+            losses.update(loss.data[0], len(batch_images) * batch_images[0].size(0) if stereo
                 else batch_images.size(0))
 
             batch_time = time.time() - end
