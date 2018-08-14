@@ -3,8 +3,11 @@ import torch
 
 class PoseNet(torch.nn.Module):
 
-    def __init__(self, feature_extractor, num_features=128):
+    def __init__(self, feature_extractor, num_features=128, track_running_stats=False,
+                pretrained=False):
         super(PoseNet, self).__init__()
+        self.track_running_stats = track_running_stats
+        self.pretrained = pretrained
         self.feature_extractor = feature_extractor
         self.feature_extractor.avgpool = torch.nn.AdaptiveAvgPool2d(1)
         fc_in_features = self.feature_extractor.fc.in_features
@@ -20,7 +23,19 @@ class PoseNet(torch.nn.Module):
         # it simplifies testing on small datasets due to eval()/train() differences
         for m in self.modules():
             if isinstance(m, torch.nn.BatchNorm2d):
-                m.track_running_stats = False
+                m.track_running_stats = self.track_running_stats
+                
+        # Initialization
+        if self.pretrained:
+            init_modules = [self.feature_extractor.fc, self.fc_xyz, self.fc_quat]
+        else:
+            init_modules = self.modules()
+            
+        for m in init_modules:
+            if isinstance(m, torch.nn.Conv2d) or isinstance(m, torch.nn.Linear):
+                torch.nn.init.kaiming_normal_(m.weight.data)
+                if m.bias is not None:
+                    torch.nn.init.constant_(m.bias.data, 0)
 
     def forward(self, x):
         # x is batch_images [batch_size x image, batch_size x image]
@@ -42,11 +57,17 @@ class PoseNet(torch.nn.Module):
 
 
 class PoseNetCriterion(torch.nn.Module):
-    def __init__(self, stereo=True, beta = 512):
+    def __init__(self, stereo=True, beta = 512.0, learn_beta=False, sx=0.0, sq=-3.0):
         super(PoseNetCriterion, self).__init__()
         self.stereo = stereo
         self.loss_fn = torch.nn.L1Loss()
-        self.beta = beta
+        self.learn_beta = learn_beta
+        if not learn_beta:
+            self.beta = beta
+        else:
+            self.beta = 1.0
+        self.sx = torch.nn.Parameter(torch.Tensor([sx]), requires_grad=learn_beta)
+        self.sq = torch.nn.Parameter(torch.Tensor([sq]), requires_grad=learn_beta)
 
     def forward(self, x, y):
         """
@@ -59,17 +80,17 @@ class PoseNetCriterion(torch.nn.Module):
         if self.stereo:
             for i in range(2):
                 # Translation loss
-                loss += self.loss_fn(x[i][:, :3], y[i][:, :3])
+                loss += torch.exp(-self.sx) * self.loss_fn(x[i][:, :3], y[i][:, :3]) + self.sx
                 # Rotation loss
-                loss += self.beta * self.loss_fn(x[i][:, 3:], y[i][:, 3:])
+                loss += torch.exp(-self.sq) * self.beta * self.loss_fn(x[i][:, 3:], y[i][:, 3:]) + self.sq
         
             # Normalize per image so we can compare stereo vs no-stereo mode
             loss = loss / 2
         else:
             # Translation loss
-            loss += self.loss_fn(x[:, :3], y[:, :3])
+            loss += torch.exp(-self.sx) * self.loss_fn(x[:, :3], y[:, :3])
             # Rotation loss
-            loss += self.beta * self.loss_fn(x[:, 3:], y[:, 3:])
+            loss += torch.exp(-self.sq) * self.beta * self.loss_fn(x[:, 3:], y[:, 3:]) + self.sq
 #         print('x = \n{}'.format(x[0]))
 #         print('y = \n{}'.format(y[0]))
         return loss
