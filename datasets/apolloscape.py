@@ -165,6 +165,8 @@ def process_poses(all_poses, pose_format='full-mat',
             R = p[:3, :3]
             t = p[:3, 3]
             q = txq.mat2quat(R)
+            # Constrain rotations to one hemisphere
+            q *= np.sign(q[0])
             new_poses[i, :3] = t
             new_poses[i, 3:] = q
 #             if i == 0:
