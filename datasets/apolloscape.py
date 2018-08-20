@@ -169,12 +169,6 @@ def process_poses(all_poses, pose_format='full-mat',
             q *= np.sign(q[0])
             new_poses[i, :3] = t
             new_poses[i, 3:] = q
-#             if i == 0:
-#                 print('R = {}'.format(R))
-#                 print('t = {}'.format(t))
-#                 print('q = {}'.format(q))
-#                 print('t.shape = {}'.format(t.shape))
-#                 print('new_poses[i] = {}'.format(new_poses[i]))
         all_poses = new_poses
 
 
@@ -227,7 +221,7 @@ class Apolloscape(Dataset):
     val_ratio = 0.25
 
     def __init__(self, root, road="road03_seg", transform=None, record=None,
-                 normalize_poses=False, pose_format='full-mat', train=None, paired=True,
+                 normalize_poses=False, pose_format='full-mat', train=None,
                  cache_transform=False, stereo=True):
         """
             Args:
@@ -235,11 +229,14 @@ class Apolloscape(Dataset):
                 road (string): Road subdir
                 transform (callable, optional): A function/transform, similar to other PyTorch datasets
                 record (string): Record name from dataset. Dataset organized in a structure '{road}/{recordXXX}'
-                pose_format (string): One of 'full-mat', 'rot-mat', 'quat', 'angles'
+                pose_format (string): One of 'full-mat', or 'quat'
                 train (bool): default None - use all dataset, True - use just train dataset,
                               False - use val portion of a dataset if `train` is not None Records selection
                               are not applicable
-                paired (bool): Retrun stereo pairs
+                cache_transform (bool): Whether to save transformed images to disk. Helps to reduce \
+                        computation needed during training by reusing already transformed and converted \
+                        images from disk. (uses a lot of disk space, stores in '_cache_transform' folder
+                stereo (bool): Retrun stereo pairs
         """
         self.root = os.path.expanduser(root)
         self.road = road
@@ -419,16 +416,6 @@ class Apolloscape(Dataset):
             return self.d_poses[self.record_idxs]
         return self.d_poses
 
-#     # TODO: [CHECK USAGE!!!!!] data 3 or 5 - track usage
-#     def poses(self):
-#         """Get poses list filtered by current record"""
-#         if self._record is not None:
-#             return self.d_poses[self.record_idxs]
-# #         poses1 = self.data_array[:, 1]
-# #         poses2 = self.data_array[:, 3]
-# #         return poses1, poses2
-#         return self.d_poses
-
 
     def poses_translations(self):
         """Get translation parts of the poses"""
@@ -541,11 +528,11 @@ class Apolloscape(Dataset):
         pos = torch.from_numpy(self.d_poses[idx])
         pos = pos.float()
             
-        # Return one image 
+        # Return one image (mono mode) 
         if not self.stereo:
             return img, pos
         
-        # Second image
+        # Second image (stereo mode)
         if self.record_idxs is not None:
             idx = self.record_idxs[ridx + 1]
         else:
@@ -559,7 +546,6 @@ class Apolloscape(Dataset):
         check_stereo_paths_consistency(img_path, img_path2)
         
         return [img, img2], [pos, pos2]
-
 
 
     def __repr__(self):
