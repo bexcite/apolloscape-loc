@@ -425,7 +425,7 @@ class Apolloscape(Dataset):
 
     def get_poses_params(self, all_records=False):
         """Returns min, max, mean and std values the poses translations"""
-        poses = self.d_poses_rec
+        poses = self.d_poses if all_records else self.d_poses_rec
         return calc_poses_params(poses, pose_format=self.pose_format)
     
 

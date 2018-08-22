@@ -1,11 +1,13 @@
 import torch
+import torch.nn.functional as F
 
 
 class PoseNet(torch.nn.Module):
 
-    def __init__(self, feature_extractor, num_features=128, track_running_stats=False,
-                pretrained=False):
+    def __init__(self, feature_extractor, num_features=128, dropout=0.5,
+                 track_running_stats=False, pretrained=False):
         super(PoseNet, self).__init__()
+        self.dropout = dropout
         self.track_running_stats = track_running_stats
         self.pretrained = pretrained
         self.feature_extractor = feature_extractor
@@ -36,6 +38,13 @@ class PoseNet(torch.nn.Module):
                 torch.nn.init.kaiming_normal_(m.weight.data)
                 if m.bias is not None:
                     torch.nn.init.constant_(m.bias.data, 0)
+                    
+    def extract_features(self, x):
+        x_features = self.feature_extractor(x)
+        x_features = F.relu(x_features)
+        if self.dropout > 0:
+            x_features = F.dropout(x_features, p=self.dropout, training=self.training)
+        return x_features
 
     def forward(self, x):
         # x is batch_images [batch_size x image, batch_size x image]
@@ -43,12 +52,12 @@ class PoseNet(torch.nn.Module):
 #         x = self.feature_extractor(x)
 
         if type(x) is list:
-            x_features = [self.feature_extractor(xi) for xi in x]
+            x_features = [self.extract_features(xi) for xi in x]
             x_translations = [self.fc_xyz(xi) for xi in x_features]
             x_rotations = [self.fc_quat(xi) for xi in x_features]
             x_poses = [torch.cat((xt, xr), dim=1) for xt, xr in zip(x_translations, x_rotations)]  
         elif torch.is_tensor(x):
-            x_features = self.feature_extractor(x)
+            x_features = self.extract_features(x)
             x_translations = self.fc_xyz(x_features) 
             x_rotations = self.fc_quat(x_features)
             x_poses = torch.cat((x_translations, x_rotations), dim=1)
