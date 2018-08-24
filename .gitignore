@@ -9,3 +9,4 @@ _checkpoints
 _cache_transform
 __img_results*
 *.pyc
+.python-version
