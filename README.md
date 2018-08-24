@@ -1,7 +1,7 @@
 # Apolloscape dataset for localization task.
 Exploring localization task on Apolloscape dataset.
 
-Read a blog post for PoseNet implementation details.
+Read my blog post about PoseNet implementation details https://capsulesbot.com/blog/2018/08/24/apolloscape-posenet-pytorch.html
 
 ECCV2018 Self-localization on-the-fly [challenge task details](http://apolloscape.auto/ECCV/challenge.html).
 
