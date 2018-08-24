@@ -7,3 +7,5 @@ __pycache__/
 _metadata
 _checkpoints
 _cache_transform
+__img_results*
+*.pyc
